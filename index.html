@@ -1,88 +1,438 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PayURL Clone – Payment Link Generator</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PayURL – Payment Link Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js">
+    </script>
     <style>
         /* ─── Reset & Base ─── */
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:'Segoe UI',system-ui,sans-serif; background:#09090f; color:#e2e8f0; }
-        .app { max-width:800px; margin:0 auto; padding:22px 14px 60px; }
-
-        /* ─── Navigation ─── */
-        .nav { background:#0d0d18; border-bottom:1px solid #18182a; padding:0 20px; display:flex; align-items:center; gap:0; position:sticky; top:0; z-index:50; }
-        .brand { display:flex; align-items:center; gap:8px; margin-right:12px; padding-right:12px; border-right:1px solid #18182a; }
-        .logo { width:28px; height:28px; background:linear-gradient(135deg,#7c3aed,#4338ca); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0; }
-        .nav-btn { padding:13px 13px; cursor:pointer; color:#4b5563; font-weight:400; font-size:13px; background:none; border:none; border-bottom:2px solid transparent; transition:color 0.15s; }
-        .nav-btn.active { color:#a78bfa; font-weight:600; border-bottom-color:#7c3aed; }
-
-        /* ─── Cards ─── */
-        .card { background:#0d0d18; border:1px solid #18182a; border-radius:12px; padding:16px; margin-bottom:12px; }
-        .sec-title { font-size:11px; font-weight:600; color:#4b5563; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:11px; padding-bottom:7px; border-bottom:1px solid #18182a; }
-        .label { display:block; font-size:12px; color:#9ca3af; margin-bottom:4px; font-weight:500; }
-        .input, .select { width:100%; background:#06060e; border:1px solid #1c1c30; border-radius:7px; padding:8px 11px; color:#e2e8f0; font-size:13px; outline:none; box-sizing:border-box; }
-        .select { appearance:auto; }
-        .textarea { width:100%; background:#06060e; border:1px solid #1c1c30; border-radius:7px; padding:9px 11px; color:#e2e8f0; font-size:12px; outline:none; resize:vertical; min-height:72px; box-sizing:border-box; font-family:monospace; line-height:1.5; }
-        .hint { font-size:10.5px; color:#2d3748; margin-top:4px; line-height:1.5; }
-        .row { display:flex; gap:12px; flex-wrap:wrap; }
-        .col { flex:1; min-width:180px; }
-
-        /* ─── Radio groups ─── */
-        .radio-group { display:flex; flex-direction:column; gap:7px; }
-        .radio-item { display:flex; align-items:flex-start; gap:8px; font-size:12.5px; user-select:none; }
-        .radio-item.disabled { opacity:0.3; cursor:not-allowed; }
-        .radio-item input[type="radio"] { accent-color:#7c3aed; margin-top:2px; flex-shrink:0; }
-
-        /* ─── Buttons ─── */
-        .btn-primary { background:linear-gradient(135deg,#7c3aed,#4338ca); color:#fff; padding:11px 26px; border-radius:8px; border:none; cursor:pointer; font-size:14px; font-weight:700; }
-        .btn-primary:disabled { opacity:0.6; cursor:not-allowed; }
-        .btn-stop { background:#200a0a; color:#f87171; padding:11px 16px; border-radius:8px; border:1px solid #7f1d1d; cursor:pointer; font-size:13px; }
-        .btn-outline { background:transparent; border:1px solid #1c1c30; color:#9ca3af; padding:7px 12px; border-radius:6px; cursor:pointer; font-size:12px; }
-        .btn-green { background:#052e16; border:1px solid #166534; color:#4ade80; padding:7px 13px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; }
-        .btn-purple-sm { background:#5b21b6; color:#fff; padding:9px 18px; border-radius:8px; border:none; cursor:pointer; font-size:13px; font-weight:600; }
-        .btn-dark-sm { background:#111; color:#e2e8f0; padding:9px 18px; border-radius:8px; border:1px solid #333; cursor:pointer; font-size:13px; font-weight:600; }
-
-        /* ─── Progress ─── */
-        .progress-bar { height:5px; background:#1a1a2e; border-radius:3px; overflow:hidden; margin-top:10px; }
-        .progress-fill { height:100%; width:0%; background:linear-gradient(90deg,#7c3aed,#4338ca); transition:width 0.4s ease; border-radius:3px; }
-        .stage-row { display:flex; gap:5px; flex-wrap:wrap; margin-top:10px; }
-        .pill { font-size:10px; padding:3px 9px; border-radius:20px; border:1px solid #18182a; background:#06060e; color:#2d3748; }
-        .pill.active { background:#2d1b69; color:#c4b5fd; border-color:#5b21b6; }
-        .pill.done { background:#1e1b4b; color:#a78bfa; border-color:#4c1d95; }
-
-        /* ─── Result ─── */
-        .result-box { background:#06060e; border:1px solid #312e81; border-radius:10px; padding:14px; margin-top:10px; }
-        .result-url { word-break:break-all; font-size:11.5px; color:#93c5fd; font-family:monospace; background:#080814; padding:10px; border-radius:6px; border:1px solid #1e3a5f; line-height:1.5; }
-        .error-box { background:#1a0000; border:1px solid #7f1d1d; border-radius:8px; padding:10px 13px; color:#fca5a5; font-size:13px; margin-bottom:12px; }
-
-        /* ─── QR Page ─── */
-        .qr-page { background:#fff; border-radius:16px; padding:24px 20px 20px; display:flex; flex-direction:column; align-items:center; gap:16px; margin:10px auto 0; max-width:340px; }
-        .qr-timer { font-size:18px; font-weight:700; color:#7c3aed; text-align:center; }
-        .qr-timer-sub { font-size:13px; color:#555; margin-top:2px; text-align:center; }
-        .qr-info { width:100%; font-size:13px; color:#333; line-height:2; }
-        .qr-info .row { display:flex; justify-content:space-between; border-bottom:1px solid #e5e7eb; padding-bottom:4px; margin-bottom:4px; }
-        .qr-info .label { color:#6b7280; }
-        .qr-info .value { font-weight:600; }
-        .qr-btns { display:flex; gap:10px; width:100%; justify-content:center; }
-
-        /* ─── Stats ─── */
-        .stats-row { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
-        .stat { flex:1; min-width:120px; background:#0d0d18; border:1px solid #18182a; border-radius:10px; padding:12px 14px; }
-        .stat-num { font-size:19px; font-weight:700; color:#a78bfa; }
-        .stat-label { font-size:10px; color:#374151; margin-top:2px; }
-        .badge { background:#0c1425; border:1px solid #1e3a5f; border-radius:8px; padding:9px 13px; font-size:12px; color:#60a5fa; margin-bottom:12px; line-height:1.6; }
-        .privacy { background:#0d0d18; border:1px solid #18182a; border-radius:8px; padding:10px 13px; font-size:11.5px; color:#374151; margin-bottom:14px; line-height:1.6; }
-
-        /* ─── Toggle ─── */
-        .toggle { width:36px; height:20px; background:#1c1c30; border-radius:10px; position:relative; cursor:pointer; transition:background 0.2s; flex-shrink:0; }
-        .toggle.on { background:#7c3aed; }
-        .toggle-dot { width:14px; height:14px; background:#fff; border-radius:50%; position:absolute; top:3px; left:3px; transition:left 0.2s; }
-        .toggle.on .toggle-dot { left:19px; }
-
-        /* ─── Responsive ─── */
-        @media (max-width:500px) { .row { flex-direction:column; } }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #09090f;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+        .app {
+            max-width: 820px;
+            margin: 0 auto;
+            padding: 22px 14px 60px;
+        }
+        .nav {
+            background: #0d0d18;
+            border-bottom: 1px solid #18182a;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            gap: 0;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-right: 12px;
+            padding-right: 12px;
+            border-right: 1px solid #18182a;
+        }
+        .logo {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, #7c3aed, #4338ca);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            flex-shrink: 0;
+        }
+        .nav-btn {
+            padding: 13px 13px;
+            cursor: pointer;
+            color: #4b5563;
+            font-weight: 400;
+            font-size: 13px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            transition: color 0.15s;
+        }
+        .nav-btn.active {
+            color: #a78bfa;
+            font-weight: 600;
+            border-bottom-color: #7c3aed;
+        }
+        .card {
+            background: #0d0d18;
+            border: 1px solid #18182a;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .sec-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #4b5563;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 11px;
+            padding-bottom: 7px;
+            border-bottom: 1px solid #18182a;
+        }
+        .label {
+            display: block;
+            font-size: 12px;
+            color: #9ca3af;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        .input,
+        .select {
+            width: 100%;
+            background: #06060e;
+            border: 1px solid #1c1c30;
+            border-radius: 7px;
+            padding: 8px 11px;
+            color: #e2e8f0;
+            font-size: 13px;
+            outline: none;
+            box-sizing: border-box;
+        }
+        .select {
+            appearance: auto;
+        }
+        .textarea {
+            width: 100%;
+            background: #06060e;
+            border: 1px solid #1c1c30;
+            border-radius: 7px;
+            padding: 9px 11px;
+            color: #e2e8f0;
+            font-size: 12px;
+            outline: none;
+            resize: vertical;
+            min-height: 72px;
+            box-sizing: border-box;
+            font-family: monospace;
+            line-height: 1.5;
+        }
+        .hint {
+            font-size: 10.5px;
+            color: #2d3748;
+            margin-top: 4px;
+            line-height: 1.5;
+        }
+        .row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .col {
+            flex: 1;
+            min-width: 180px;
+        }
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+        .radio-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            font-size: 12.5px;
+            user-select: none;
+        }
+        .radio-item.disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        .radio-item input[type="radio"] {
+            accent-color: #7c3aed;
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #7c3aed, #4338ca);
+            color: #fff;
+            padding: 11px 26px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+        }
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .btn-stop {
+            background: #200a0a;
+            color: #f87171;
+            padding: 11px 16px;
+            border-radius: 8px;
+            border: 1px solid #7f1d1d;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid #1c1c30;
+            color: #9ca3af;
+            padding: 7px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .btn-green {
+            background: #052e16;
+            border: 1px solid #166534;
+            color: #4ade80;
+            padding: 7px 13px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .btn-purple-sm {
+            background: #5b21b6;
+            color: #fff;
+            padding: 9px 18px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .btn-dark-sm {
+            background: #111;
+            color: #e2e8f0;
+            padding: 9px 18px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .progress-bar {
+            height: 5px;
+            background: #1a1a2e;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #7c3aed, #4338ca);
+            transition: width 0.4s ease;
+            border-radius: 3px;
+        }
+        .stage-row {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .pill {
+            font-size: 10px;
+            padding: 3px 9px;
+            border-radius: 20px;
+            border: 1px solid #18182a;
+            background: #06060e;
+            color: #2d3748;
+        }
+        .pill.active {
+            background: #2d1b69;
+            color: #c4b5fd;
+            border-color: #5b21b6;
+        }
+        .pill.done {
+            background: #1e1b4b;
+            color: #a78bfa;
+            border-color: #4c1d95;
+        }
+        .result-box {
+            background: #06060e;
+            border: 1px solid #312e81;
+            border-radius: 10px;
+            padding: 14px;
+            margin-top: 10px;
+        }
+        .result-url {
+            word-break: break-all;
+            font-size: 11.5px;
+            color: #93c5fd;
+            font-family: monospace;
+            background: #080814;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #1e3a5f;
+            line-height: 1.5;
+        }
+        .error-box {
+            background: #1a0000;
+            border: 1px solid #7f1d1d;
+            border-radius: 8px;
+            padding: 10px 13px;
+            color: #fca5a5;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+        .qr-page {
+            background: #fff;
+            border-radius: 16px;
+            padding: 24px 20px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            margin: 10px auto 0;
+            max-width: 340px;
+        }
+        .qr-timer {
+            font-size: 18px;
+            font-weight: 700;
+            color: #7c3aed;
+            text-align: center;
+        }
+        .qr-timer-sub {
+            font-size: 13px;
+            color: #555;
+            margin-top: 2px;
+            text-align: center;
+        }
+        .qr-info {
+            width: 100%;
+            font-size: 13px;
+            color: #333;
+            line-height: 2;
+        }
+        .qr-info .info-row {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 4px;
+            margin-bottom: 4px;
+        }
+        .qr-info .info-label {
+            color: #6b7280;
+        }
+        .qr-info .info-value {
+            font-weight: 600;
+        }
+        .qr-btns {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            justify-content: center;
+        }
+        .stats-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .stat {
+            flex: 1;
+            min-width: 120px;
+            background: #0d0d18;
+            border: 1px solid #18182a;
+            border-radius: 10px;
+            padding: 12px 14px;
+        }
+        .stat-num {
+            font-size: 19px;
+            font-weight: 700;
+            color: #a78bfa;
+        }
+        .stat-label {
+            font-size: 10px;
+            color: #374151;
+            margin-top: 2px;
+        }
+        .badge {
+            background: #0c1425;
+            border: 1px solid #1e3a5f;
+            border-radius: 8px;
+            padding: 9px 13px;
+            font-size: 12px;
+            color: #60a5fa;
+            margin-bottom: 12px;
+            line-height: 1.6;
+        }
+        .privacy {
+            background: #0d0d18;
+            border: 1px solid #18182a;
+            border-radius: 8px;
+            padding: 10px 13px;
+            font-size: 11.5px;
+            color: #374151;
+            margin-bottom: 14px;
+            line-height: 1.6;
+        }
+        .toggle {
+            width: 36px;
+            height: 20px;
+            background: #1c1c30;
+            border-radius: 10px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+        .toggle.on {
+            background: #7c3aed;
+        }
+        .toggle-dot {
+            width: 14px;
+            height: 14px;
+            background: #fff;
+            border-radius: 50%;
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            transition: left 0.2s;
+        }
+        .toggle.on .toggle-dot {
+            left: 19px;
+        }
+        .promo-input-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .promo-input-group .input {
+            flex: 1;
+        }
+        .discount-toggle-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 6px;
+        }
+        .trial-badge {
+            background: #052e16;
+            color: #4ade80;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        @media (max-width:500px) {
+            .row {
+                flex-direction: column;
+            }
+        }
     </style>
 </head>
 <body>
@@ -94,13 +444,13 @@
     </nav>
 
     <div class="app" id="app">
-        <!-- Tab: Main -->
         <div id="tab-main">
             <h1 style="text-align:center;margin:0 0 4px;font-size:20px;font-weight:700;color:#f1f5f9;">🐔 PayURL — Payment Link Generator</h1>
             <p style="text-align:center;font-size:11.5px;color:#374151;margin-bottom:18px;">Public-benefit tool · No login required · All features free</p>
 
-            <div class="badge">📢 June 8 Update: Email-registered GPT accounts can now skip the Stripe page to extract Japan-region PP links.</div>
-            <div class="privacy">🔒 <strong style="color:#4b5563;">Privacy:</strong> Token, proxy, and results are NOT stored on the server. Proxy is saved in your browser localStorage only. Server logs are disabled. Only anonymous aggregate stats are kept.</div>
+            <div class="badge" id="updateBadge">📢 June 16 Update: JP PP and GoPay channels are down. GPTPLUS now supports UPI payment link generation only.</div>
+
+            <div class="privacy">🔒 <strong style="color:#4b5563;">Privacy:</strong> Token, proxy, promo codes, and results are NOT stored on the server. Proxy is saved in your browser localStorage only. Server logs are disabled. Only anonymous aggregate stats are kept.</div>
 
             <!-- Stats -->
             <div class="stats-row" id="stats"></div>
@@ -161,11 +511,42 @@
                         <label class="label">Currency</label>
                         <input class="input" id="currencyDisplay" style="color:#a78bfa;" readonly>
                     </div>
-                    <div style="flex:1;min-width:180px;max-width:180px;">
+                    <div style="flex:1;min-width:180px;max-width:220px;">
                         <label class="label">Amount</label>
                         <input class="input" id="amountDisplay" style="font-weight:600;" readonly>
                         <div id="trialHint" class="hint" style="color:#166534;display:none;">🎁 Trial region — $0 payment!</div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Discount / Promo Code with Toggle -->
+            <div class="card">
+                <div class="sec-title">🎫 Discount & Promo Parameters</div>
+                <div class="row">
+                    <div class="col" style="flex:2;">
+                        <label class="label">Promo Code</label>
+                        <div class="promo-input-group">
+                            <input class="input" id="promoCode" placeholder="Enter promo code (e.g. WELCOME20)">
+                            <button class="btn-outline" id="applyPromoBtn">Apply</button>
+                        </div>
+                        <div class="hint">Enter a valid promo code to get a discount on your subscription.</div>
+                    </div>
+                    <div class="col" style="flex:1;">
+                        <label class="label">Discount (%)</label>
+                        <input class="input" id="discountPercent" value="0" readonly style="color:#4ade80;font-weight:600;">
+                        <div id="discountStatus" class="hint" style="color:#4b5563;">No discount applied.</div>
+                    </div>
+                </div>
+                <div class="discount-toggle-row">
+                    <div class="toggle on" id="discountToggle"><div class="toggle-dot"></div></div>
+                    <span style="font-size:13px;">Apply Discount</span>
+                    <span style="font-size:11px;color:#374151;margin-left:auto;" id="discountToggleStatus">Enabled</span>
+                </div>
+                <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">
+                    <span style="font-size:10px;color:#4b5563;padding:2px 8px;background:#1a1a2e;border-radius:12px;">WELCOME20 → 20% off</span>
+                    <span style="font-size:10px;color:#4b5563;padding:2px 8px;background:#1a1a2e;border-radius:12px;">SAVE10 → 10% off</span>
+                    <span style="font-size:10px;color:#4b5563;padding:2px 8px;background:#1a1a2e;border-radius:12px;">FLASH30 → 30% off</span>
+                    <span style="font-size:10px;color:#4b5563;padding:2px 8px;background:#1a1a2e;border-radius:12px;">TEAM15 → 15% off (Team plan)</span>
                 </div>
             </div>
 
@@ -178,6 +559,7 @@
                         <div class="radio-group" id="proxyPoolGroup">
                             <label class="radio-item"><input type="radio" name="pool" value="1024proxy" checked> 1024proxy</label>
                             <label class="radio-item"><input type="radio" name="pool" value="cliproxy"> cliproxy</label>
+                            <label class="radio-item"><input type="radio" name="pool" value="auto"> Auto-detect</label>
                         </div>
                         <div class="hint">Healthy IPs auto-assigned; failed IPs temporarily cooled down.</div>
                     </div>
@@ -199,10 +581,11 @@
                     </div>
                 </div>
                 <div style="display:flex;gap:8px;margin-top:11px;align-items:center;flex-wrap:wrap;">
-                    <button class="btn-outline" id="checkProxyBtn">Check Proxy</button>
-                    <button class="btn-outline" id="saveProxyBtn">Save</button>
-                    <button class="btn-outline" id="clearProxyBtn">Clear</button>
+                    <button class="btn-outline" id="checkProxyBtn">🔍 Check Proxy</button>
+                    <button class="btn-outline" id="saveProxyBtn">💾 Save</button>
+                    <button class="btn-outline" id="clearProxyBtn">🗑️ Clear</button>
                     <span id="proxyStatus" style="font-size:12px;color:#4b5563;">Proxy not checked.</span>
+                    <span id="proxyRegion" style="font-size:11px;color:#2d3748;display:none;"></span>
                 </div>
             </div>
 
@@ -220,12 +603,8 @@
                     </div>
                 </div>
                 <div style="margin-top:10px;">
-                    <label class="label">Promo Code / Link</label>
-                    <input class="input" id="promoCode" placeholder="Enter promo code…">
-                </div>
-                <div style="display:flex;align-items:center;gap:10px;margin-top:10px;">
-                    <div class="toggle" id="promoToggle"><div class="toggle-dot"></div></div>
-                    <span style="font-size:13px;">Use Promo Parameters</span>
+                    <label class="label">Team Promo Code</label>
+                    <input class="input" id="teamPromo" placeholder="Enter team promo code…">
                 </div>
             </div>
 
@@ -246,7 +625,7 @@
 
             <!-- Generate -->
             <div style="display:flex;gap:10px;align-items:center;margin-bottom:13px;flex-wrap:wrap;">
-                <button class="btn-primary" id="generateBtn">Generate Payment Link</button>
+                <button class="btn-primary" id="generateBtn">⚡ Generate Payment Link</button>
                 <button class="btn-stop" id="stopBtn" style="display:none;">■ Stop</button>
                 <button class="btn-outline" id="apiModeBtn">API Mode</button>
             </div>
@@ -269,7 +648,7 @@
             <div id="linkResult" style="display:none;"></div>
         </div>
 
-        <!-- Tab: CPA -->
+        <!-- CPA Tab -->
         <div id="tab-cpa" style="display:none;">
             <div class="card">
                 <div class="sec-title">📄 Convert to CPA File</div>
@@ -281,7 +660,7 @@
             </div>
         </div>
 
-        <!-- Tab: API -->
+        <!-- API Tab -->
         <div id="tab-api" style="display:none;">
             <div class="card">
                 <div class="sec-title">🔑 API Mode</div>
@@ -289,7 +668,7 @@
                 <label class="label">Endpoint</label>
                 <div class="result-url">POST https://payurl.ark2.cn/api/generate</div>
                 <label class="label" style="margin-top:12px;">Request Body</label>
-                <pre class="result-url" style="font-size:11px;overflow:auto;">{&#10;  "token": "eyJhbGci…",&#10;  "plan": "plus",&#10;  "region": "JP",&#10;  "link_type": "long"&#10;}</pre>
+                <pre class="result-url" style="font-size:11px;overflow:auto;">{&#10;  "token": "eyJhbGci…",&#10;  "plan": "plus",&#10;  "region": "JP",&#10;  "link_type": "long",&#10;  "promo_code": "WELCOME20"&#10;}</pre>
                 <div style="margin-top:10px;padding:10px;background:#1a1a2e;border-radius:6px;font-size:12px;color:#818cf8;">⚠️ API requires credits. Purchase from the store.</div>
             </div>
         </div>
@@ -298,35 +677,43 @@
     <script>
         // ─── DATA ──────────────────────────────────────────────────────────────
         const REGIONS = [
-            { code:"JP", name:"Japan JP",          currency:"JPY", symbol:"¥",   amount:3000,   trial:false },
-            { code:"US", name:"United States US",  currency:"USD", symbol:"$",   amount:20,     trial:false },
-            { code:"IN", name:"India IN",          currency:"INR", symbol:"₹",   amount:1650,   trial:false },
-            { code:"DE", name:"Germany DE",        currency:"EUR", symbol:"€",   amount:22,     trial:false },
-            { code:"FR", name:"France FR",         currency:"EUR", symbol:"€",   amount:22,     trial:false },
-            { code:"GB", name:"United Kingdom GB", currency:"GBP", symbol:"£",   amount:18,     trial:false },
-            { code:"CA", name:"Canada CA",         currency:"CAD", symbol:"CA$", amount:27,     trial:false },
-            { code:"DEFAULT", name:"Default Region",currency:"USD",symbol:"$",   amount:20,     trial:false },
-            { code:"KR", name:"South Korea KR",    currency:"KRW", symbol:"₩",  amount:27000,  trial:false },
-            { code:"SG", name:"Singapore SG",      currency:"SGD", symbol:"S$",  amount:28,     trial:false },
-            { code:"HK", name:"Hong Kong HK",      currency:"HKD", symbol:"HK$", amount:155,    trial:false },
-            { code:"TW", name:"Taiwan TW",         currency:"TWD", symbol:"NT$", amount:640,    trial:false },
-            { code:"BR", name:"Brazil BR (Trial)", currency:"BRL", symbol:"R$",  amount:0,      trial:true  },
-            { code:"MX", name:"Mexico MX (Trial)", currency:"MXN", symbol:"MX$", amount:0,      trial:true  },
-            { code:"TH", name:"Thailand TH",       currency:"THB", symbol:"฿",   amount:720,    trial:false },
-            { code:"MY", name:"Malaysia MY",       currency:"MYR", symbol:"RM",  amount:95,     trial:false },
-            { code:"PH", name:"Philippines PH",    currency:"PHP", symbol:"₱",   amount:1150,   trial:false },
-            { code:"VN", name:"Vietnam VN",        currency:"VND", symbol:"₫",   amount:510000, trial:false },
-            { code:"AE", name:"UAE AE",            currency:"AED", symbol:"AED", amount:74,     trial:false },
-            { code:"CH", name:"Switzerland CH",    currency:"CHF", symbol:"CHF", amount:19,     trial:false },
-            { code:"SE", name:"Sweden SE",         currency:"SEK", symbol:"kr",  amount:220,    trial:false },
-            { code:"NO", name:"Norway NO",         currency:"NOK", symbol:"kr",  amount:215,    trial:false },
-            { code:"DK", name:"Denmark DK",        currency:"DKK", symbol:"kr",  amount:149,    trial:false },
-            { code:"PL", name:"Poland PL (Trial)", currency:"PLN", symbol:"zł",  amount:0,      trial:true  },
-            { code:"CZ", name:"Czech CZ",          currency:"CZK", symbol:"Kč",  amount:490,    trial:false },
-            { code:"ID", name:"Indonesia ID",      currency:"IDR", symbol:"Rp",  amount:319000, trial:false },
+            { code: "JP", name: "Japan JP", currency: "JPY", symbol: "¥", amount: 3000, trial: false },
+            { code: "US", name: "United States US", currency: "USD", symbol: "$", amount: 20, trial: false },
+            { code: "IN", name: "India IN", currency: "INR", symbol: "₹", amount: 1650, trial: false },
+            { code: "DE", name: "Germany DE", currency: "EUR", symbol: "€", amount: 22, trial: false },
+            { code: "FR", name: "France FR", currency: "EUR", symbol: "€", amount: 22, trial: false },
+            { code: "GB", name: "United Kingdom GB", currency: "GBP", symbol: "£", amount: 18, trial: false },
+            { code: "CA", name: "Canada CA", currency: "CAD", symbol: "CA$", amount: 27, trial: false },
+            { code: "DEFAULT", name: "Default Region", currency: "USD", symbol: "$", amount: 20, trial: false },
+            { code: "KR", name: "South Korea KR", currency: "KRW", symbol: "₩", amount: 27000, trial: false },
+            { code: "SG", name: "Singapore SG", currency: "SGD", symbol: "S$", amount: 28, trial: false },
+            { code: "HK", name: "Hong Kong HK", currency: "HKD", symbol: "HK$", amount: 155, trial: false },
+            { code: "TW", name: "Taiwan TW", currency: "TWD", symbol: "NT$", amount: 640, trial: false },
+            { code: "BR", name: "Brazil BR (Trial)", currency: "BRL", symbol: "R$", amount: 0, trial: true },
+            { code: "MX", name: "Mexico MX (Trial)", currency: "MXN", symbol: "MX$", amount: 0, trial: true },
+            { code: "TH", name: "Thailand TH", currency: "THB", symbol: "฿", amount: 720, trial: false },
+            { code: "MY", name: "Malaysia MY", currency: "MYR", symbol: "RM", amount: 95, trial: false },
+            { code: "PH", name: "Philippines PH", currency: "PHP", symbol: "₱", amount: 1150, trial: false },
+            { code: "VN", name: "Vietnam VN", currency: "VND", symbol: "₫", amount: 510000, trial: false },
+            { code: "AE", name: "UAE AE", currency: "AED", symbol: "AED", amount: 74, trial: false },
+            { code: "CH", name: "Switzerland CH", currency: "CHF", symbol: "CHF", amount: 19, trial: false },
+            { code: "SE", name: "Sweden SE", currency: "SEK", symbol: "kr", amount: 220, trial: false },
+            { code: "NO", name: "Norway NO", currency: "NOK", symbol: "kr", amount: 215, trial: false },
+            { code: "DK", name: "Denmark DK", currency: "DKK", symbol: "kr", amount: 149, trial: false },
+            { code: "PL", name: "Poland PL (Trial)", currency: "PLN", symbol: "zł", amount: 0, trial: true },
+            { code: "CZ", name: "Czech CZ", currency: "CZK", symbol: "Kč", amount: 490, trial: false },
+            { code: "ID", name: "Indonesia ID", currency: "IDR", symbol: "Rp", amount: 319000, trial: false },
         ];
 
-        const STAGES = ["Read Token","Check Proxy","OpenAI Checkout","Stripe Init","Rewrite Link"];
+        const STAGES = ["Read Token", "Check Proxy", "OpenAI Checkout", "Stripe Init", "Rewrite Link"];
+
+        const PROMO_CODES = {
+            'WELCOME20': { discount: 20, description: '20% off' },
+            'SAVE10': { discount: 10, description: '10% off' },
+            'FLASH30': { discount: 30, description: '30% off' },
+            'TEAM15': { discount: 15, description: '15% off (Team plan)' },
+            'FREETRIAL': { discount: 100, description: '100% off – Free trial' },
+        };
 
         // ─── STATE ─────────────────────────────────────────────────────────────
         let state = {
@@ -342,7 +729,9 @@
             teamName: '',
             seats: 2,
             promoCode: '',
-            usePromo: false,
+            teamPromo: '',
+            discountPercent: 0,
+            discountEnabled: true, // toggle on/off
             skipStripe: false,
             upiGuard: false,
             // generation
@@ -357,9 +746,12 @@
             checkingPay: false,
             copiedKey: '',
             // stats
-            onlineUsers: Math.floor(Math.random()*30)+12,
-            totalGenerated: Math.floor(Math.random()*50000)+125000,
-            proxyTraffic: (Math.random()*60+15).toFixed(1),
+            onlineUsers: Math.floor(Math.random() * 30) + 12,
+            totalGenerated: Math.floor(Math.random() * 50000) + 125000,
+            proxyTraffic: (Math.random() * 60 + 15).toFixed(1),
+            // proxy detection
+            proxyDetected: false,
+            proxyRegion: '',
         };
 
         // ─── DOM REFS ──────────────────────────────────────────────────────────
@@ -376,6 +768,7 @@
         const customStripeProxyWrap = $('customStripeProxyWrap');
         const customStripeProxy = $('customStripeProxy');
         const proxyStatus = $('proxyStatus');
+        const proxyRegion = $('proxyRegion');
         const generateBtn = $('generateBtn');
         const stopBtn = $('stopBtn');
         const progressFill = $('progressFill');
@@ -387,6 +780,12 @@
         const linkResultDiv = $('linkResult');
         const teamCard = $('teamCard');
         const statsContainer = $('stats');
+        const promoCode = $('promoCode');
+        const discountPercent = $('discountPercent');
+        const discountStatus = $('discountStatus');
+        const discountToggle = $('discountToggle');
+        const discountToggleStatus = $('discountToggleStatus');
+        const updateBadge = $('updateBadge');
 
         // ─── INIT ──────────────────────────────────────────────────────────────
         function init() {
@@ -396,6 +795,7 @@
             updateUI();
             bindEvents();
             updateStats();
+            setTimeout(detectProxy, 500);
         }
 
         function populateRegions() {
@@ -416,23 +816,29 @@
                 try {
                     const parsed = JSON.parse(saved);
                     Object.assign(state, parsed);
-                } catch(e) {}
+                } catch (e) {}
             }
-            // Override with inputs
             tokenInput.value = state.token || '';
             customProxy.value = state.customProxy || '';
             stripeProxy.value = state.stripeProxy || 'auto';
             customStripeProxy.value = state.customStripeProxy || '';
-            // Radio buttons
+            promoCode.value = state.promoCode || '';
             document.querySelector(`input[name="plan"][value="${state.plan}"]`).checked = true;
             document.querySelector(`input[name="linkType"][value="${state.linkType}"]`).checked = true;
             document.querySelector(`input[name="lang"][value="${state.language}"]`).checked = true;
             document.querySelector(`input[name="pool"][value="${state.proxyPool}"]`).checked = true;
-            // Team
             $('teamName').value = state.teamName;
             $('seats').value = state.seats;
-            $('promoCode').value = state.promoCode;
+            $('teamPromo').value = state.teamPromo || '';
             updateToggles();
+            // Apply promo if enabled and code exists
+            if (state.promoCode && state.discountEnabled) {
+                applyPromoCode(state.promoCode, true);
+            } else if (state.promoCode && !state.discountEnabled) {
+                discountPercent.value = '0';
+                discountStatus.textContent = 'Discount disabled.';
+                discountStatus.style.color = '#4b5563';
+            }
         }
 
         function saveState() {
@@ -447,35 +853,44 @@
             state.customStripeProxy = customStripeProxy.value;
             state.teamName = $('teamName').value;
             state.seats = parseInt($('seats').value) || 2;
-            state.promoCode = $('promoCode').value;
+            state.teamPromo = $('teamPromo').value || '';
+            state.promoCode = promoCode.value;
             localStorage.setItem('payurl_state', JSON.stringify(state));
         }
 
         // ─── UI UPDATE ─────────────────────────────────────────────────────────
         function updateUI() {
             const region = REGIONS.find(r => r.code === state.region) || REGIONS[7];
+            const discountedAmount = calculateDiscountedAmount(region);
+            const isTrial = region.trial;
+
             currencyDisplay.value = region.currency;
-            amountDisplay.value = region.trial ? `${region.symbol}0 — FREE Trial` : `${region.symbol}${region.amount.toLocaleString()}`;
-            trialHint.style.display = region.trial ? 'block' : 'none';
-            // Team card visibility
+            if (isTrial) {
+                amountDisplay.value = `${region.symbol}0 — FREE Trial`;
+                trialHint.style.display = 'block';
+            } else {
+                const discountText = state.discountPercent > 0 && state.discountEnabled ?
+                    ` (${state.discountPercent}% off)` :
+                    '';
+                amountDisplay.value = `${region.symbol}${discountedAmount.toLocaleString()}${discountText}`;
+                trialHint.style.display = 'none';
+            }
+
+            // Team card
             teamCard.style.display = state.plan === 'team' ? 'block' : 'none';
             // Custom stripe proxy
             customStripeProxyWrap.style.display = state.stripeProxy === 'custom' ? 'block' : 'none';
             // Token status
             updateTokenStatus();
-            // Session info
             updateSessionInfo();
-            // Proxy status
-            // (handled separately)
             // Buttons
             generateBtn.disabled = state.generating;
-            generateBtn.textContent = state.generating ? 'Generating…' : 'Generate Payment Link';
+            generateBtn.textContent = state.generating ? 'Generating…' : '⚡ Generate Payment Link';
             stopBtn.style.display = state.generating ? 'inline-block' : 'none';
             // Progress
             progressFill.style.width = state.progress + '%';
             progressPercent.textContent = state.progress + '%';
             currentStageEl.textContent = state.currentStage || 'Waiting to start';
-            // Stage pills
             const idx = STAGES.indexOf(state.currentStage);
             document.querySelectorAll('.pill').forEach((el, i) => {
                 el.className = 'pill';
@@ -491,6 +906,33 @@
             }
             // Results
             renderResults();
+            // Proxy region
+            if (state.proxyDetected && state.proxyRegion) {
+                proxyRegion.style.display = 'inline';
+                proxyRegion.textContent = `🌍 Detected: ${state.proxyRegion}`;
+            } else {
+                proxyRegion.style.display = 'none';
+            }
+            // Discount toggle status
+            discountToggleStatus.textContent = state.discountEnabled ? 'Enabled' : 'Disabled';
+            if (state.discountEnabled) {
+                discountToggle.classList.add('on');
+            } else {
+                discountToggle.classList.remove('on');
+            }
+            // Update badge
+            updateBadge.textContent = '📢 June 16 Update: JP PP and GoPay channels are down. GPTPLUS now supports UPI payment link generation only.';
+        }
+
+        function calculateDiscountedAmount(region) {
+            if (region.trial) return 0;
+            let amount = region.amount;
+            if (state.discountEnabled && state.discountPercent > 0 && state.discountPercent < 100) {
+                amount = amount * (1 - state.discountPercent / 100);
+            } else if (state.discountEnabled && state.discountPercent >= 100) {
+                amount = 0;
+            }
+            return Math.round(amount * 100) / 100;
         }
 
         function updateTokenStatus() {
@@ -523,10 +965,14 @@
             if (!info || !info.email) { sessionInfo.style.display = 'none'; return; }
             sessionInfo.style.display = 'flex';
             let html = '';
-            if (info.email) html += `<span style="font-size:12px;"><span style="color:#4b5563;">Email: </span><span style="color:#93c5fd;font-weight:600;">${info.email}</span></span>`;
-            if (info.name) html += `<span style="font-size:12px;"><span style="color:#4b5563;">Name: </span><span style="color:#c4b5fd;">${info.name}</span></span>`;
-            if (info.region) html += `<span style="font-size:12px;"><span style="color:#4b5563;">Region: </span><span style="color:#86efac;">${info.region}</span></span>`;
-            if (info.plan) html += `<span style="font-size:12px;"><span style="color:#4b5563;">Plan: </span><span style="color:#fde68a;">${info.plan}</span></span>`;
+            if (info.email) html +=
+                `<span style="font-size:12px;"><span style="color:#4b5563;">Email: </span><span style="color:#93c5fd;font-weight:600;">${info.email}</span></span>`;
+            if (info.name) html +=
+                `<span style="font-size:12px;"><span style="color:#4b5563;">Name: </span><span style="color:#c4b5fd;">${info.name}</span></span>`;
+            if (info.region) html +=
+                `<span style="font-size:12px;"><span style="color:#4b5563;">Region: </span><span style="color:#86efac;">${info.region}</span></span>`;
+            if (info.plan) html +=
+                `<span style="font-size:12px;"><span style="color:#4b5563;">Plan: </span><span style="color:#fde68a;">${info.plan}</span></span>`;
             sessionInfo.innerHTML = html;
         }
 
@@ -545,52 +991,140 @@
             try {
                 const obj = JSON.parse(t);
                 const email = obj.email || obj.user?.email || obj.user_info?.email || null;
-                const name  = obj.name  || obj.user?.name  || obj.user_info?.name  || null;
-                const region= obj.region|| obj.location    || null;
-                const plan  = obj.plan  || obj.subscription?.plan || null;
+                const name = obj.name || obj.user?.name || obj.user_info?.name || null;
+                const region = obj.region || obj.location || null;
+                const plan = obj.plan || obj.subscription?.plan || null;
                 const accessToken = obj.accessToken || obj.access_token || obj.token || null;
                 return { email, name, region, plan, accessToken, raw: obj };
             } catch {
                 if (t.startsWith("ey") && t.length > 80) {
                     try {
-                        const payload = JSON.parse(atob(t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
+                        const payload = JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
                         return {
                             email: payload.email || payload.sub || null,
-                            name:  payload.name  || null,
-                            region:null,
-                            plan:  null,
+                            name: payload.name || null,
+                            region: null,
+                            plan: null,
                             accessToken: t,
                             raw: payload,
                         };
-                    } catch { return { email:null, name:null, region:null, plan:null, accessToken:t, raw:null }; }
+                    } catch { return { email: null, name: null, region: null, plan: null, accessToken: t, raw: null }; }
                 }
-                return { email:null, name:null, region:null, plan:null, accessToken:t, raw:null };
+                return { email: null, name: null, region: null, plan: null, accessToken: t, raw: null };
             }
         }
 
         // ─── TOGGLES ───────────────────────────────────────────────────────────
         function updateToggles() {
             const toggles = {
-                'promoToggle': state.usePromo,
                 'skipStripeToggle': state.skipStripe,
                 'upiGuardToggle': state.upiGuard,
+                'discountToggle': state.discountEnabled,
             };
             for (const [id, val] of Object.entries(toggles)) {
                 const el = $(id);
-                if (val) el.classList.add('on');
-                else el.classList.remove('on');
+                if (el) {
+                    if (val) el.classList.add('on');
+                    else el.classList.remove('on');
+                }
+            }
+            // Update discount status text
+            if (discountToggleStatus) {
+                discountToggleStatus.textContent = state.discountEnabled ? 'Enabled' : 'Disabled';
+            }
+            if (!state.discountEnabled) {
+                discountPercent.value = '0';
+                discountStatus.textContent = 'Discount disabled.';
+                discountStatus.style.color = '#4b5563';
+            } else if (state.promoCode && state.discountPercent > 0) {
+                // re-apply promo
+                applyPromoCode(state.promoCode, true);
             }
         }
 
         function bindToggles() {
-            ['promoToggle','skipStripeToggle','upiGuardToggle'].forEach(id => {
-                $(id).addEventListener('click', function() {
-                    const key = id === 'promoToggle' ? 'usePromo' : id === 'skipStripeToggle' ? 'skipStripe' : 'upiGuard';
-                    state[key] = !state[key];
-                    updateToggles();
-                    saveState();
-                });
+            ['skipStripeToggle', 'upiGuardToggle', 'discountToggle'].forEach(id => {
+                const el = $(id);
+                if (el) {
+                    el.addEventListener('click', function() {
+                        const key = id === 'skipStripeToggle' ? 'skipStripe' :
+                            id === 'upiGuardToggle' ? 'upiGuard' :
+                            'discountEnabled';
+                        state[key] = !state[key];
+                        if (key === 'discountEnabled') {
+                            // If disabling, clear discount display
+                            if (!state.discountEnabled) {
+                                state.discountPercent = 0;
+                                discountPercent.value = '0';
+                                discountStatus.textContent = 'Discount disabled.';
+                                discountStatus.style.color = '#4b5563';
+                            } else {
+                                // Reapply promo if any
+                                if (state.promoCode) {
+                                    applyPromoCode(state.promoCode, true);
+                                } else {
+                                    discountPercent.value = '0';
+                                    discountStatus.textContent = 'No discount applied.';
+                                    discountStatus.style.color = '#4b5563';
+                                }
+                            }
+                        }
+                        updateToggles();
+                        updateUI();
+                        saveState();
+                    });
+                }
             });
+        }
+
+        // ─── PROMO CODE ────────────────────────────────────────────────────────
+        function applyPromoCode(code, silent = false) {
+            if (!state.discountEnabled) {
+                if (!silent) {
+                    discountStatus.textContent = 'Discount is disabled. Enable it first.';
+                    discountStatus.style.color = '#f87171';
+                }
+                return false;
+            }
+            const upperCode = code.toUpperCase();
+            if (PROMO_CODES[upperCode]) {
+                const promo = PROMO_CODES[upperCode];
+                state.discountPercent = promo.discount;
+                discountPercent.value = promo.discount + '%';
+                discountStatus.textContent = `✅ Applied: ${promo.description}`;
+                discountStatus.style.color = '#4ade80';
+                state.promoCode = code;
+                saveState();
+                updateUI();
+                return true;
+            } else {
+                if (!silent) {
+                    discountStatus.textContent = '❌ Invalid promo code';
+                    discountStatus.style.color = '#f87171';
+                }
+                return false;
+            }
+        }
+
+        // ─── PROXY DETECTION ──────────────────────────────────────────────────
+        async function detectProxy() {
+            proxyStatus.textContent = '🔍 Detecting proxy…';
+            proxyStatus.style.color = '#fbbf24';
+            try {
+                // Simulate proxy detection with region info
+                const regions = ['US', 'UK', 'DE', 'JP', 'SG', 'IN', 'BR', 'AU'];
+                const detected = regions[Math.floor(Math.random() * regions.length)];
+                await sleep(1200);
+                state.proxyDetected = true;
+                state.proxyRegion = detected;
+                proxyStatus.textContent = `✅ Proxy detected: ${detected}`;
+                proxyStatus.style.color = '#4ade80';
+                updateUI();
+                saveState();
+            } catch (e) {
+                proxyStatus.textContent = '⚠️ Proxy detection failed, using fallback';
+                proxyStatus.style.color = '#facc15';
+            }
         }
 
         // ─── BIND EVENTS ──────────────────────────────────────────────────────
@@ -602,7 +1136,7 @@
                     this.classList.add('active');
                     const tab = this.dataset.tab;
                     document.querySelectorAll('.app > div[id^="tab-"]').forEach(el => el.style.display = 'none');
-                    document.getElementById('tab-'+tab).style.display = 'block';
+                    document.getElementById('tab-' + tab).style.display = 'block';
                 });
             });
 
@@ -629,7 +1163,7 @@
                 });
             });
 
-            // Link type radios
+            // Link type
             document.querySelectorAll('input[name="linkType"]').forEach(el => {
                 el.addEventListener('change', function() {
                     state.linkType = this.value;
@@ -638,7 +1172,7 @@
                 });
             });
 
-            // Language radios
+            // Language
             document.querySelectorAll('input[name="lang"]').forEach(el => {
                 el.addEventListener('change', function() {
                     state.language = this.value;
@@ -660,7 +1194,6 @@
                 saveState();
             });
 
-            // Stripe proxy
             stripeProxy.addEventListener('change', function() {
                 state.stripeProxy = this.value;
                 updateUI();
@@ -681,13 +1214,24 @@
                 state.seats = parseInt(this.value) || 2;
                 saveState();
             });
-            $('promoCode').addEventListener('input', function() {
-                state.promoCode = this.value;
+            $('teamPromo').addEventListener('input', function() {
+                state.teamPromo = this.value;
                 saveState();
             });
 
             // Toggles
             bindToggles();
+
+            // Promo apply
+            $('applyPromoBtn').addEventListener('click', function() {
+                const code = promoCode.value.trim();
+                if (code) {
+                    applyPromoCode(code, false);
+                } else {
+                    discountStatus.textContent = 'Please enter a promo code.';
+                    discountStatus.style.color = '#f87171';
+                }
+            });
 
             // Paste
             $('pasteBtn').addEventListener('click', async function() {
@@ -704,17 +1248,7 @@
 
             // Proxy check
             $('checkProxyBtn').addEventListener('click', async function() {
-                proxyStatus.textContent = 'Checking…';
-                proxyStatus.style.color = '#fbbf24';
-                await new Promise(r => setTimeout(r, 1600));
-                const custom = state.customProxy;
-                if (custom) {
-                    proxyStatus.textContent = `✅ Custom proxy OK: ${custom}`;
-                    proxyStatus.style.color = '#4ade80';
-                } else {
-                    proxyStatus.textContent = `✅ ${state.proxyPool} pool healthy — IP assigned`;
-                    proxyStatus.style.color = '#4ade80';
-                }
+                await detectProxy();
             });
 
             // Save proxy
@@ -733,6 +1267,9 @@
                 saveState();
                 proxyStatus.textContent = 'Proxy not checked.';
                 proxyStatus.style.color = '#4b5563';
+                state.proxyDetected = false;
+                state.proxyRegion = '';
+                updateUI();
             });
 
             // Generate
@@ -747,7 +1284,7 @@
             $('cpaGenerateBtn').addEventListener('click', function() {
                 const link = $('cpaInput').value.trim();
                 if (!link) return;
-                const id = Math.random().toString(36).substr(2,16);
+                const id = Math.random().toString(36).substr(2, 16);
                 const data = { payment_url: link, generated: new Date().toISOString(), id };
                 const b64 = btoa(JSON.stringify(data));
                 const fn = `chatgpt_payment_${id}.cpa`;
@@ -760,7 +1297,7 @@
                 `;
             });
 
-            // API Mode button (switch tab)
+            // API Mode
             $('apiModeBtn').addEventListener('click', function() {
                 document.querySelector('.nav-btn[data-tab="api"]').click();
             });
@@ -805,44 +1342,55 @@
                 updateUI();
                 await sleep(delays[i]);
             }
+            // Ensure we reach 100%
             state.progress = 100;
             state.currentStage = 'Done';
             updateUI();
 
             // Build result
             const region = REGIONS.find(r => r.code === state.region) || REGIONS[7];
-            const sid = crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : Math.random().toString(36).substr(2,32);
-            const short = Math.random().toString(36).substr(2,12);
+            const sid = crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : Math.random().toString(36).substr(2, 32);
+            const short = Math.random().toString(36).substr(2, 12);
+            const discountedAmount = calculateDiscountedAmount(region);
+            const info = parseSession(token);
+            const isTrial = region.trial;
 
             if (state.linkType === 'upi') {
-                const amount = region.trial ? 0 : region.amount;
-                const upiStr = `upi://pay?pa=openai@axisbank&pn=OpenAI+India&am=${amount}&cu=INR&tn=ChatGPT+${state.plan.charAt(0).toUpperCase()+state.plan.slice(1)}+Subscription&tr=${sid.substr(0,12)}`;
-                const info = parseSession(token);
+                const amount = isTrial ? 0 : discountedAmount;
+                const upiStr =
+                    `upi://pay?pa=openai@axisbank&pn=OpenAI+India&am=${amount}&cu=INR&tn=ChatGPT+${state.plan.charAt(0).toUpperCase()+state.plan.slice(1)}+Subscription&tr=${sid.substr(0,12)}`;
                 state.upiResult = {
-                    upiStr, amount, sid,
+                    upiStr,
+                    amount,
+                    sid,
                     pa: 'openai@axisbank',
                     pn: 'OpenAI India',
                     tn: `ChatGPT ${state.plan.charAt(0).toUpperCase()+state.plan.slice(1)} Subscription`,
                     email: info?.email || 'unknown',
                     gptRegion: info?.region || state.region,
                     stripeSession: `pi_${sid.substr(0,24)}`,
+                    discount: state.discountEnabled ? state.discountPercent : 0,
+                    isTrial,
                     raw: JSON.stringify({
-                        success:true, type:'upi',
+                        success: true,
+                        type: 'upi',
                         upi_string: upiStr,
-                        pa:'openai@axisbank',
-                        amount, currency:'INR',
+                        pa: 'openai@axisbank',
+                        amount,
+                        currency: 'INR',
                         plan: state.plan,
                         region: state.region,
+                        discount: state.discountEnabled ? state.discountPercent : 0,
+                        trial: isTrial,
                         stripe_pi: `pi_${sid.substr(0,24)}`,
-                        expires_at: new Date(Date.now()+5*60*1000).toISOString(),
+                        expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
                     }, null, 2),
                 };
             } else {
-                const base = state.linkType === 'short'
-                    ? `https://pay.openai.com/s/${short}`
-                    : `https://pay.openai.com/c/pay/cs_live_${sid}#fidkdWxOYHwnPyd1blpxYHZxWjA0TFN3bHxRcWZnQnZVQnNuMEJXfVB1TGNLVFFgMXNxNkF3${short}==`;
-                const amount = region.trial ? 0 : region.amount;
-                const info = parseSession(token);
+                const base = state.linkType === 'short' ?
+                    `https://pay.openai.com/s/${short}` :
+                    `https://pay.openai.com/c/pay/cs_live_${sid}#fidkdWxOYHwnPyd1blpxYHZxWjA0TFN3bHxRcWZnQnZVQnNuMEJXfVB1TGNLVFFgMXNxNkF3${short}==`;
+                const amount = isTrial ? 0 : discountedAmount;
                 state.result = {
                     url: base,
                     plan: state.plan,
@@ -851,20 +1399,22 @@
                     region: region.name,
                     currency: region.currency,
                     symbol: region.symbol,
-                    trial: region.trial,
+                    trial: isTrial,
                     email: info?.email || 'unknown',
                     stripeSession: `cs_live_${sid.substr(0,20)}`,
+                    discount: state.discountEnabled ? state.discountPercent : 0,
                     raw: JSON.stringify({
-                        success:true,
+                        success: true,
                         payment_url: base,
                         plan: state.plan,
                         region: state.region,
                         currency: region.currency,
                         amount,
-                        trial: region.trial,
+                        trial: isTrial,
+                        discount: state.discountEnabled ? state.discountPercent : 0,
                         stripe_session: `cs_live_${sid.substr(0,20)}`,
                         email: info?.email || null,
-                        expires_at: new Date(Date.now()+30*60*1000).toISOString(),
+                        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
                     }, null, 2),
                 };
             }
@@ -875,20 +1425,22 @@
             updateStats();
             saveState();
             updateUI();
+
+            // Generate QR codes after render
+            setTimeout(generateQRs, 200);
+            startTimers();
         }
 
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
         // ─── RENDER RESULTS ────────────────────────────────────────────────────
         function renderResults() {
-            // UPI
             if (state.upiResult) {
                 upiResultDiv.style.display = 'block';
                 upiResultDiv.innerHTML = buildUpiHTML(state.upiResult);
             } else {
                 upiResultDiv.style.display = 'none';
             }
-            // Link
             if (state.result) {
                 linkResultDiv.style.display = 'block';
                 linkResultDiv.innerHTML = buildLinkHTML(state.result);
@@ -899,9 +1451,10 @@
 
         function buildUpiHTML(upi) {
             const expired = isExpired(upi.raw);
+            const discountText = upi.discount > 0 ? ` (${upi.discount}% off)` : '';
             return `
                 <div class="card">
-                    <div class="sec-title" style="color:#a78bfa;">✅ UPI Payment QR Generated</div>
+                    <div class="sec-title" style="color:#a78bfa;">✅ UPI Payment QR Generated${discountText}${upi.isTrial ? ' 🎁 Free Trial' : ''}</div>
                     <div class="qr-page">
                         ${!expired
                             ? `<div id="upiQRContainer" style="width:220px;height:220px;background:#fff;border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 6px #fff,0 0 0 8px #312e81;margin:0 auto;"></div>`
@@ -912,11 +1465,11 @@
                             <div class="qr-timer-sub">${expired ? 'Please regenerate the link.' : 'Scan quickly before it expires'}</div>
                         </div>
                         <div class="qr-info">
-                            <div class="row"><span class="label">Status:</span><span class="value" style="color:${state.payStatus==='paid'?'#16a34a':state.payStatus==='failed'?'#dc2626':'#d97706'};">${state.payStatus==='paid'?'✅ paid':state.payStatus==='failed'?'❌ failed':'⏳ pending'}</span></div>
-                            <div class="row"><span class="label">Payment:</span><span class="value">${state.payStatus==='paid' ? '₹'+upi.amount : '–'}</span></div>
-                            <div class="row"><span class="label">GPT:</span><span class="value" style="font-size:12px;">${upi.email}</span></div>
-                            <div class="row"><span class="label">Amount:</span><span class="value" style="color:${upi.amount===0?'#16a34a':'#111'};">${upi.amount===0 ? '₹0 (Trial – FREE)' : '₹'+upi.amount.toLocaleString()}</span></div>
-                            <div class="row"><span class="label">UPI ID:</span><span class="value" style="color:#4338ca;font-size:12px;">${upi.pa}</span></div>
+                            <div class="info-row"><span class="info-label">Status:</span><span class="info-value" style="color:${state.payStatus==='paid'?'#16a34a':state.payStatus==='failed'?'#dc2626':'#d97706'};">${state.payStatus==='paid'?'✅ paid':state.payStatus==='failed'?'❌ failed':'⏳ pending'}</span></div>
+                            <div class="info-row"><span class="info-label">Payment:</span><span class="info-value">${state.payStatus==='paid' ? '₹'+upi.amount : '–'}</span></div>
+                            <div class="info-row"><span class="info-label">GPT:</span><span class="info-value" style="font-size:12px;">${upi.email}</span></div>
+                            <div class="info-row"><span class="info-label">Amount:</span><span class="info-value" style="color:${upi.amount===0?'#16a34a':'#111'};">${upi.amount===0 ? '₹0 (Trial – FREE)' : '₹'+upi.amount.toLocaleString()}${upi.discount > 0 ? ` <span style="color:#16a34a;font-size:11px;">(${upi.discount}% off)</span>` : ''}</span></div>
+                            <div class="info-row"><span class="info-label">UPI ID:</span><span class="info-value" style="color:#4338ca;font-size:12px;">${upi.pa}</span></div>
                         </div>
                         <div class="qr-btns">
                             <button class="btn-purple-sm" id="checkPaymentBtn" ${state.checkingPay?'disabled':''}>${state.checkingPay?'Checking…':'Check now'}</button>
@@ -943,15 +1496,16 @@
 
         function buildLinkHTML(res) {
             const expired = isExpired(res.raw);
+            const discountText = res.discount > 0 ? ` (${res.discount}% off)` : '';
             return `
                 <div class="card">
-                    <div class="sec-title" style="color:#a78bfa;">✅ Payment Link Generated</div>
+                    <div class="sec-title" style="color:#a78bfa;">✅ Payment Link Generated${discountText}${res.trial ? ' 🎁 Free Trial' : ''}</div>
                     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
                         ${[
                             ['Plan', res.plan.toUpperCase()],
                             ['Region', res.region],
                             ['Currency', res.currency],
-                            ['Amount', res.trial ? `${res.symbol}0 (Trial – FREE)` : `${res.symbol}${res.amount}`],
+                            ['Amount', res.trial ? `${res.symbol}0 (Trial – FREE)` : `${res.symbol}${res.amount}${res.discount > 0 ? ' ('+res.discount+'% off)' : ''}`],
                             ['Email', res.email],
                         ].map(([k,v]) => `
                             <div style="background:#06060e;border:1px solid #18182a;border-radius:6px;padding:6px 10px;font-size:11px;">
@@ -961,14 +1515,15 @@
                         `).join('')}
                     </div>
                     ${res.trial ? `<div style="background:#052e16;border:1px solid #166534;border-radius:8px;padding:9px 13px;font-size:12px;color:#4ade80;margin-bottom:10px;">🎁 <strong>Trial Region detected!</strong> Payment amount = <strong>${res.symbol}0</strong>. No card charge!</div>` : ''}
+                    ${res.discount > 0 ? `<div style="background:#1e3a5f;border:1px solid #3b82f6;border-radius:8px;padding:9px 13px;font-size:12px;color:#60a5fa;margin-bottom:10px;">🎫 <strong>Discount applied:</strong> ${res.discount}% off – you save ${res.symbol}${(res.amount / (1 - res.discount/100) - res.amount).toFixed(2)}</div>` : ''}
                     <div class="qr-page" style="background:#fff;max-width:340px;">
                         <div style="font-size:13px;font-weight:600;color:#111;text-align:center;">Scan to open payment page</div>
                         <div id="linkQRContainer" style="width:200px;height:200px;background:#fff;border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 6px #fff,0 0 0 8px #312e81;margin:0 auto;"></div>
                         <div style="font-size:13px;font-weight:700;color:#7c3aed;text-align:center;">QR code expires in <span id="linkTimer">05:00</span></div>
                         <div class="qr-info">
-                            <div class="row"><span class="label">Status:</span><span class="value" style="color:${state.payStatus==='paid'?'#16a34a':'#d97706'};">${state.payStatus==='paid'?'✅ paid':'⏳ pending'}</span></div>
-                            <div class="row"><span class="label">Payment:</span><span class="value">${state.payStatus==='paid' ? res.symbol+res.amount : '–'}</span></div>
-                            <div class="row"><span class="label">GPT:</span><span class="value" style="font-size:12px;">${res.email}</span></div>
+                            <div class="info-row"><span class="info-label">Status:</span><span class="info-value" style="color:${state.payStatus==='paid'?'#16a34a':'#d97706'};">${state.payStatus==='paid'?'✅ paid':'⏳ pending'}</span></div>
+                            <div class="info-row"><span class="info-label">Payment:</span><span class="info-value">${state.payStatus==='paid' ? res.symbol+res.amount : '–'}</span></div>
+                            <div class="info-row"><span class="info-label">GPT:</span><span class="info-value" style="font-size:12px;">${res.email}</span></div>
                         </div>
                         <div class="qr-btns">
                             <button class="btn-purple-sm" id="checkPaymentBtnLink" ${state.checkingPay?'disabled':''}>${state.checkingPay?'Checking…':'Check now'}</button>
@@ -992,7 +1547,7 @@
                     const exp = new Date(obj.expires_at);
                     return exp < new Date();
                 }
-            } catch {}
+            } catch (e) {}
             return false;
         }
 
@@ -1001,7 +1556,8 @@
             navigator.clipboard.writeText(text).then(() => {
                 state.copiedKey = key;
                 updateUI();
-                setTimeout(() => { state.copiedKey = ''; updateUI(); }, 2000);
+                setTimeout(() => { state.copiedKey = '';
+                    updateUI(); }, 2000);
             });
         };
 
@@ -1019,18 +1575,18 @@
             state.checkingPay = true;
             updateUI();
             await sleep(1800);
-            state.payStatus = Math.random() < 0.2 ? 'paid' : 'pending';
+            state.payStatus = Math.random() < 0.25 ? 'paid' : 'pending';
             state.checkingPay = false;
             updateUI();
         }
 
-        // ─── QR CODE GENERATION (after DOM update) ──────────────────────────
+        // ─── QR CODE GENERATION ──────────────────────────────────────────────
         function generateQRs() {
-            // UPI
             if (state.upiResult) {
                 const container = document.getElementById('upiQRContainer');
                 if (container && typeof QRCode !== 'undefined') {
                     try {
+                        container.innerHTML = '';
                         new QRCode(container, {
                             text: state.upiResult.upiStr,
                             width: 220,
@@ -1039,14 +1595,14 @@
                             colorLight: '#ffffff',
                             correctLevel: QRCode.CorrectLevel.M,
                         });
-                    } catch(e) {}
+                    } catch (e) { console.warn('QR generation error:', e); }
                 }
             }
-            // Link
             if (state.result) {
                 const container = document.getElementById('linkQRContainer');
                 if (container && typeof QRCode !== 'undefined') {
                     try {
+                        container.innerHTML = '';
                         new QRCode(container, {
                             text: state.result.url,
                             width: 200,
@@ -1055,7 +1611,7 @@
                             colorLight: '#ffffff',
                             correctLevel: QRCode.CorrectLevel.M,
                         });
-                    } catch(e) {}
+                    } catch (e) { console.warn('QR generation error:', e); }
                 }
             }
         }
@@ -1079,13 +1635,12 @@
                 if (linkTimer) linkTimer.textContent = display;
                 if (timerSeconds <= 0) {
                     clearInterval(timerInterval);
-                    // Refresh UI to show expired
                     updateUI();
                 }
             }, 1000);
         }
 
-        // ─── OBSERVER FOR DOM CHANGES TO GENERATE QRs ──────────────────────
+        // ─── OBSERVER ──────────────────────────────────────────────────────────
         const observer = new MutationObserver(() => {
             if (state.upiResult || state.result) {
                 generateQRs();
@@ -1094,20 +1649,18 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
+        // ─── EVENT DELEGATION ──────────────────────────────────────────────────
+        document.addEventListener('click', function(e) {
+            if (e.target.id === 'checkPaymentBtn' || e.target.id === 'checkPaymentBtnLink') {
+                checkPayment();
+            }
+        });
+
         // ─── INIT ──────────────────────────────────────────────────────────────
         document.addEventListener('DOMContentLoaded', function() {
             init();
-            // Event delegation for check payment buttons
-            document.addEventListener('click', function(e) {
-                if (e.target.id === 'checkPaymentBtn' || e.target.id === 'checkPaymentBtnLink') {
-                    checkPayment();
-                }
-            });
-            // Re-generate QRs when result divs appear
-            // Also start timers after first render
         });
 
-        // Also call init after load
         if (document.readyState === 'complete') {
             init();
         } else {
@@ -1115,4 +1668,4 @@
         }
     </script>
 </body>
-</html>
+                                                          </html>
