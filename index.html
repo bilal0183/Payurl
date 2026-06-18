@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PayURL Clone – Payment Link Generator</title>
+  <!-- React & Babel (standalone) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- QRCode library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    /* Reset & base styles – same as original but hardened */
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Segoe UI',system-ui,sans-serif; background:#09090f; color:#e2e8f0; }
+    #root { min-height:100vh; }
+    /* all other styles are defined inside the component via the `S` object */
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    // ─── FULL REACT COMPONENT (fixed & self‑contained) ──────────────────────
+    const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+    // ─── QR CODE HOOK (robust) ──────────────────────────────────────────────
+    function useQR(text, size = 200) {
+      const containerRef = useRef(null);
+      const qrInstance = useRef(null);
+
+      useEffect(() => {
+        if (!text || !containerRef.current) return;
+        const container = containerRef.current;
+        // Clear previous QR
+        container.innerHTML = '';
+
+        // QRCode constructor may not be available immediately; use a small delay
+        const generate = () => {
+          if (typeof QRCode === 'undefined') {
+            setTimeout(generate, 200);
+            return;
+          }
+          try {
+            qrInstance.current = new QRCode(container, {
+              text,
+              width: size,
+              height: size,
+              colorDark: '#000000',
+              colorLight: '#ffffff',
+              correctLevel: QRCode.CorrectLevel.M,
+            });
+          } catch (e) {
+            console.warn('QR generation error:', e);
+          }
+        };
+        generate();
+        return () => { if (qrInstance.current) { /* no cleanup needed */ } };
+      }, [text, size]);
+
+      return containerRef;
+    }
+
+    // ─── DATA ─────────────────────────────────────────────────────────────────
+    const REGIONS = [
+      { code:"JP", name:"Japan JP",          currency:"JPY", symbol:"¥",   amount:3000,   trial:false },
+      { code:"US", name:"United States US",  currency:"USD", symbol:"$",   amount:20,     trial:false },
+      { code:"IN", name:"India IN",          currency:"INR", symbol:"₹",   amount:1650,   trial:false },
+      { code:"DE", name:"Germany DE",        currency:"EUR", symbol:"€",   amount:22,     trial:false },
+      { code:"FR", name:"France FR",         currency:"EUR", symbol:"€",   amount:22,     trial:false },
+      { code:"GB", name:"United Kingdom GB", currency:"GBP", symbol:"£",   amount:18,     trial:false },
+      { code:"CA", name:"Canada CA",         currency:"CAD", symbol:"CA$", amount:27,     trial:false },
+      { code:"DEFAULT", name:"Default Region",currency:"USD",symbol:"$",   amount:20,     trial:false },
+      { code:"KR", name:"South Korea KR",    currency:"KRW", symbol:"₩",  amount:27000,  trial:false },
+      { code:"SG", name:"Singapore SG",      currency:"SGD", symbol:"S$",  amount:28,     trial:false },
+      { code:"HK", name:"Hong Kong HK",      currency:"HKD", symbol:"HK$", amount:155,    trial:false },
+      { code:"TW", name:"Taiwan TW",         currency:"TWD", symbol:"NT$", amount:640,    trial:false },
+      { code:"BR", name:"Brazil BR (Trial)", currency:"BRL", symbol:"R$",  amount:0,      trial:true  },
+      { code:"MX", name:"Mexico MX (Trial)", currency:"MXN", symbol:"MX$", amount:0,      trial:true  },
+      { code:"TH", name:"Thailand TH",       currency:"THB", symbol:"฿",   amount:720,    trial:false },
+      { code:"MY", name:"Malaysia MY",       currency:"MYR", symbol:"RM",  amount:95,     trial:false },
+      { code:"PH", name:"Philippines PH",    currency:"PHP", symbol:"₱",   amount:1150,   trial:false },
+      { code:"VN", name:"Vietnam VN",        currency:"VND", symbol:"₫",   amount:510000, trial:false },
+      { code:"AE", name:"UAE AE",            currency:"AED", symbol:"AED", amount:74,     trial:false },
+      { code:"CH", name:"Switzerland CH",    currency:"CHF", symbol:"CHF", amount:19,     trial:false },
+      { code:"SE", name:"Sweden SE",         currency:"SEK", symbol:"kr",  amount:220,    trial:false },
+      { code:"NO", name:"Norway NO",         currency:"NOK", symbol:"kr",  amount:215,    trial:false },
+      { code:"DK", name:"Denmark DK",        currency:"DKK", symbol:"kr",  amount:149,    trial:false },
+      { code:"PL", name:"Poland PL (Trial)", currency:"PLN", symbol:"zł",  amount:0,      trial:true  },
+      { code:"CZ", name:"Czech CZ",          currency:"CZK", symbol:"Kč",  amount:490,    trial:false },
+      { code:"ID", name:"Indonesia ID",      currency:"IDR", symbol:"Rp",  amount:319000, trial:false },
+    ];
+
+    const PLANS = [
+      { id:"plus",  label:"ChatGPT Plus",        desc:"Personal – $20/mo"       },
+      { id:"team",  label:"ChatGPT Team",         desc:"Team workspace"           },
+      { id:"codex", label:"Low-price Codex Space",desc:"Discounted Codex env"    },
+    ];
+
+    const LINK_TYPES = [
+      { id:"long",  label:"Payment Long Link"                           },
+      { id:"short", label:"Payment Short Link"                         },
+      { id:"upi",   label:"India UPI QR Code"                          },
+      { id:"pp",    label:"PP Link (Japan) – Unavailable",  disabled:true },
+      { id:"gopay", label:"GoPay (Indonesia) – Unavailable",disabled:true },
+    ];
+
+    const PROXY_POOLS = [
+      { id:"1024proxy", label:"1024proxy" },
+      { id:"cliproxy",  label:"cliproxy"  },
+    ];
+
+    const STAGES = ["Read Token","Check Proxy","OpenAI Checkout","Stripe Init","Rewrite Link"];
+
+    // ─── SESSION JSON PARSER ─────────────────────────────────────────────────
+    function parseSession(raw) {
+      const t = raw.trim();
+      if (!t) return null;
+      try {
+        const obj = JSON.parse(t);
+        const email = obj.email || obj.user?.email || obj.user_info?.email || null;
+        const name  = obj.name  || obj.user?.name  || obj.user_info?.name  || null;
+        const region= obj.region|| obj.location    || null;
+        const plan  = obj.plan  || obj.subscription?.plan || null;
+        const accessToken = obj.accessToken || obj.access_token || obj.token || null;
+        return { email, name, region, plan, accessToken, raw: obj };
+      } catch {
+        // JWT
+        if (t.startsWith("ey") && t.length > 80) {
+          try {
+            const payload = JSON.parse(atob(t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
+            return {
+              email: payload.email || payload.sub || null,
+              name:  payload.name  || null,
+              region:null,
+              plan:  null,
+              accessToken: t,
+              raw: payload,
+            };
+          } catch { return { email:null, name:null, region:null, plan:null, accessToken:t, raw:null }; }
+        }
+        return { email:null, name:null, region:null, plan:null, accessToken:t, raw:null };
+      }
+    }
+
+    // ─── COUNTDOWN HOOK ──────────────────────────────────────────────────────
+    function useCountdown(seconds, active) {
+      const [left, setLeft] = useState(seconds);
+      useEffect(() => {
+        if (!active) { setLeft(seconds); return; }
+        const iv = setInterval(() => setLeft(p => Math.max(0, p - 1)), 1000);
+        return () => clearInterval(iv);
+      }, [active, seconds]);
+      const mm = String(Math.floor(left / 60)).padStart(2,"0");
+      const ss = String(left % 60).padStart(2,"0");
+      return { left, display:`${mm}:${ss}`, expired: left === 0 };
+    }
+
+    // ─── QR DISPLAY COMPONENT ───────────────────────────────────────────────
+    function QRDisplay({ text, size = 200 }) {
+      const ref = useQR(text, size);
+      return (
+        <div
+          ref={ref}
+          style={{
+            width: size, height: size,
+            background: '#fff',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 0 0 6px #fff, 0 0 0 8px #312e81',
+            margin: '0 auto',
+          }}
+        />
+      );
+    }
+
+    // ─── TOGGLE SWITCH ──────────────────────────────────────────────────────
+    function Toggle({ on, onChange }) {
+      return (
+        <div style={{ width:36, height:20, background:on?'#7c3aed':'#1c1c30', borderRadius:10, position:'relative', cursor:'pointer', transition:'background 0.2s', flexShrink:0 }}
+             onClick={() => onChange(!on)}>
+          <div style={{ width:14, height:14, background:'#fff', borderRadius:'50%', position:'absolute', top:3, left:on?19:3, transition:'left 0.2s' }} />
+        </div>
+      );
+    }
+
+    // ─── MAIN APP ────────────────────────────────────────────────────────────
+    function PayURLClone() {
+      // Tabs
+      const [activeTab, setActiveTab] = useState('main');
+
+      // Token
+      const [tokenRaw,     setTokenRaw]     = useState('');
+      const [sessionInfo,  setSessionInfo]  = useState(null);
+      const [tokenStatus,  setTokenStatus]  = useState('Token not recognized yet.');
+
+      // Form
+      const [plan,         setPlan]         = useState('plus');
+      const [linkType,     setLinkType]     = useState('long');
+      const [language,     setLanguage]     = useState('en');
+      const [region,       setRegion]       = useState('DEFAULT');
+      const [proxyPool,    setProxyPool]    = useState('1024proxy');
+      const [customProxy,  setCustomProxy]  = useState('');
+      const [stripeProxy,  setStripeProxy]  = useState('auto');
+      const [customStripeP,setCustomStripeP]= useState('');
+      const [proxyStatus,  setProxyStatus]  = useState('Proxy not checked.');
+      const [proxyChecking,setProxyChecking]= useState(false);
+      const [teamName,     setTeamName]     = useState('');
+      const [seats,        setSeats]        = useState(2);
+      const [promoCode,    setPromoCode]    = useState('');
+      const [usePromo,     setUsePromo]     = useState(false);
+      const [skipStripe,   setSkipStripe]   = useState(false);
+      const [upiGuard,     setUpiGuard]     = useState(false);
+
+      // Generation
+      const [generating,   setGenerating]   = useState(false);
+      const [progress,     setProgress]     = useState(0);
+      const [currentStage, setCurrentStage] = useState('');
+      const [result,       setResult]       = useState(null);
+      const [upiResult,    setUpiResult]    = useState(null);
+      const [error,        setError]        = useState(null);
+      const [showRaw,      setShowRaw]      = useState(false);
+      const [copied,       setCopied]       = useState('');
+
+      // Payment status (for QR page)
+      const [payStatus,    setPayStatus]    = useState('pending');
+      const [checkingPay,  setCheckingPay]  = useState(false);
+
+      const stopRef = useRef(false);
+
+      // Countdown 5 min for QR/link
+      const countdown = useCountdown(300, !!upiResult || !!result);
+
+      // Stats (simulated)
+      const [onlineUsers]    = useState(Math.floor(Math.random()*30)+12);
+      const [totalGenerated] = useState(Math.floor(Math.random()*50000)+125000);
+      const [proxyTraffic]   = useState((Math.random()*60+15).toFixed(1));
+
+      // Token parse
+      useEffect(() => {
+        const t = tokenRaw.trim();
+        if (!t) { setTokenStatus('Token not recognized yet.'); setSessionInfo(null); return; }
+        const info = parseSession(t);
+        setSessionInfo(info);
+        if (info.email)        setTokenStatus(`✅ Recognized · ${info.email}${info.name ? ' ('+info.name+')' : ''}`);
+        else if (info.accessToken && t.startsWith('ey')) setTokenStatus('✅ Access Token (JWT) – email not decoded');
+        else if (t.length > 20) setTokenStatus('⚠️ Unknown format, will attempt anyway…');
+        else setTokenStatus('Token not recognized yet.');
+      }, [tokenRaw]);
+
+      const regionObj = REGIONS.find(x => x.code === region) || REGIONS[7];
+
+      // ── Clipboard paste ─────────────────────────────────────────────────────
+      const pasteToken = async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          setTokenRaw(text);
+        } catch {
+          alert('Cannot read clipboard — please paste manually.');
+        }
+      };
+
+      // ── Proxy check ─────────────────────────────────────────────────────────
+      const checkProxy = async () => {
+        setProxyChecking(true);
+        setProxyStatus('Checking…');
+        await new Promise(r => setTimeout(r, 1600));
+        setProxyStatus(customProxy ? `✅ Custom proxy OK: ${customProxy}` : `✅ ${proxyPool} pool healthy — IP assigned`);
+        setProxyChecking(false);
+      };
+
+      // ── Generate ────────────────────────────────────────────────────────────
+      const generate = async () => {
+        if (!tokenRaw.trim()) {
+          setError('Please enter your Access Token or Session JSON first.');
+          return;
+        }
+        stopRef.current = false;
+        setGenerating(true);
+        setProgress(0);
+        setResult(null);
+        setUpiResult(null);
+        setError(null);
+        setCurrentStage('');
+        setPayStatus('pending');
+
+        const delays = [900, 700, 1300, 1000, 750];
+        for (let i = 0; i < STAGES.length; i++) {
+          if (stopRef.current) {
+            setGenerating(false);
+            setCurrentStage('Stopped');
+            setProgress(0);
+            return;
+          }
+          setCurrentStage(STAGES[i]);
+          setProgress(Math.round((i / STAGES.length) * 100));
+          await new Promise(r => setTimeout(r, delays[i]));
+        }
+        setProgress(100);
+        setCurrentStage('Done');
+
+        // Generate real‑looking results
+        const sid = crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : Math.random().toString(36).substr(2, 32);
+        const short = Math.random().toString(36).substr(2, 12);
+
+        if (linkType === 'upi') {
+          const amount = regionObj.trial ? 0 : regionObj.amount;
+          const upiStr = `upi://pay?pa=openai@axisbank&pn=OpenAI+India&am=${amount}&cu=INR&tn=ChatGPT+${plan.charAt(0).toUpperCase()+plan.slice(1)}+Subscription&tr=${sid.substr(0,12)}`;
+          setUpiResult({
+            upiStr, amount, sid,
+            pa: 'openai@axisbank',
+            pn: 'OpenAI India',
+            tn: `ChatGPT ${plan.charAt(0).toUpperCase()+plan.slice(1)} Subscription`,
+            email: sessionInfo?.email || 'unknown',
+            gptRegion: sessionInfo?.region || region,
+            stripeSession: `pi_${sid.substr(0,24)}`,
+            raw: JSON.stringify({
+              success: true,
+              type: 'upi',
+              upi_string: upiStr,
+              pa: 'openai@axisbank',
+              amount,
+              currency: 'INR',
+              plan,
+              region,
+              stripe_pi: `pi_${sid.substr(0,24)}`,
+              expires_at: new Date(Date.now()+5*60*1000).toISOString(),
+            }, null, 2),
+          });
+        } else {
+          // Build a realistic payment URL
+          const base = linkType === 'short'
+            ? `https://pay.openai.com/s/${short}`
+            : `https://pay.openai.com/c/pay/cs_live_${sid}#fidkdWxOYHwnPyd1blpxYHZxWjA0TFN3bHxRcWZnQnZVQnNuMEJXfVB1TGNLVFFgMXNxNkF3${short}==`;
+          const amount = regionObj.trial ? 0 : regionObj.amount;
+          setResult({
+            url: base,
+            plan,
+            linkType,
+            amount,
+            region: regionObj.name,
+            currency: regionObj.currency,
+            symbol: regionObj.symbol,
+            trial: regionObj.trial,
+            email: sessionInfo?.email || 'unknown',
+            stripeSession: `cs_live_${sid.substr(0,20)}`,
+            raw: JSON.stringify({
+              success: true,
+              payment_url: base,
+              plan,
+              region,
+              currency: regionObj.currency,
+              amount,
+              trial: regionObj.trial,
+              stripe_session: `cs_live_${sid.substr(0,20)}`,
+              email: sessionInfo?.email || null,
+              expires_at: new Date(Date.now()+30*60*1000).toISOString(),
+            }, null, 2),
+          });
+        }
+
+        setGenerating(false);
+      };
+
+      const stop = () => { stopRef.current = true; };
+
+      const copyText = (text, key) => {
+        navigator.clipboard.writeText(text).then(() => {
+          setCopied(key);
+          setTimeout(() => setCopied(''), 2000);
+        });
+      };
+
+      // ── Check payment status ──────────────────────────────────────────────
+      const checkPayment = async () => {
+        setCheckingPay(true);
+        await new Promise(r => setTimeout(r, 1800));
+        setPayStatus(Math.random() < 0.2 ? 'paid' : 'pending');
+        setCheckingPay(false);
+      };
+
+      // ─── STYLES (condensed but identical) ──────────────────────────────────
+      const S = {
+        root: { minHeight: '100vh', background: '#09090f', color: '#e2e8f0', fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: '14px' },
+        nav: { background: '#0d0d18', borderBottom: '1px solid #18182a', padding: '0 20px', display: 'flex', alignItems: 'center', gap: '0', position: 'sticky', top: 0, zIndex: 50 },
+        brand: { display: 'flex', alignItems: 'center', gap: '8px', marginRight: '12px', paddingRight: '12px', borderRight: '1px solid #18182a' },
+        logo: { width: 28, height: 28, background: 'linear-gradient(135deg,#7c3aed,#4338ca)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', flexShrink: 0 },
+        navTab: (a) => ({ padding: '13px 13px', cursor: 'pointer', color: a ? '#a78bfa' : '#4b5563', fontWeight: a ? 600 : 400, fontSize: '13px', background: 'none', border: 'none', borderBottom: a ? '2px solid #7c3aed' : '2px solid transparent', transition: 'color 0.15s' }),
+        wrap: { maxWidth: 800, margin: '0 auto', padding: '22px 14px 60px' },
+        h1: { textAlign: 'center', margin: '0 0 4px', fontSize: '20px', fontWeight: 700, color: '#f1f5f9' },
+        sub: { textAlign: 'center', fontSize: '11.5px', color: '#374151', marginBottom: '18px' },
+        badge: { background: '#0c1425', border: '1px solid #1e3a5f', borderRadius: '8px', padding: '9px 13px', fontSize: '12px', color: '#60a5fa', marginBottom: '12px', lineHeight: 1.6 },
+        privacy: { background: '#0d0d18', border: '1px solid #18182a', borderRadius: '8px', padding: '10px 13px', fontSize: '11.5px', color: '#374151', marginBottom: '14px', lineHeight: 1.6 },
+        statsRow: { display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' },
+        stat: { flex: 1, minWidth: '120px', background: '#0d0d18', border: '1px solid #18182a', borderRadius: '10px', padding: '12px 14px' },
+        statN: { fontSize: '19px', fontWeight: 700, color: '#a78bfa' },
+        statL: { fontSize: '10px', color: '#374151', marginTop: '2px' },
+        card: { background: '#0d0d18', border: '1px solid #18182a', borderRadius: '12px', padding: '16px', marginBottom: '12px' },
+        secTitle: { fontSize: '11px', fontWeight: 600, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '11px', paddingBottom: '7px', borderBottom: '1px solid #18182a' },
+        label: { display: 'block', fontSize: '12px', color: '#9ca3af', marginBottom: '4px', fontWeight: 500 },
+        input: { width: '100%', background: '#06060e', border: '1px solid #1c1c30', borderRadius: '7px', padding: '8px 11px', color: '#e2e8f0', fontSize: '13px', outline: 'none', boxSizing: 'border-box' },
+        textarea: { width: '100%', background: '#06060e', border: '1px solid #1c1c30', borderRadius: '7px', padding: '9px 11px', color: '#e2e8f0', fontSize: '12px', outline: 'none', resize: 'vertical', minHeight: '72px', boxSizing: 'border-box', fontFamily: 'monospace', lineHeight: 1.5 },
+        select: { width: '100%', background: '#06060e', border: '1px solid #1c1c30', borderRadius: '7px', padding: '8px 11px', color: '#e2e8f0', fontSize: '13px', outline: 'none' },
+        hint: { fontSize: '10.5px', color: '#2d3748', marginTop: '4px', lineHeight: 1.5 },
+        row: { display: 'flex', gap: '12px', flexWrap: 'wrap' },
+        col: { flex: 1, minWidth: '180px' },
+        radioG: { display: 'flex', flexDirection: 'column', gap: '7px' },
+        radioI: (dis) => ({ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: dis ? 'not-allowed' : 'pointer', opacity: dis ? 0.3 : 1, fontSize: '12.5px', userSelect: 'none' }),
+        radio: { accentColor: '#7c3aed', marginTop: '2px', flexShrink: 0 },
+        btnP: { background: 'linear-gradient(135deg,#7c3aed,#4338ca)', color: '#fff', padding: '11px 26px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 700 },
+        btnStop: { background: '#200a0a', color: '#f87171', padding: '11px 16px', borderRadius: '8px', border: '1px solid #7f1d1d', cursor: 'pointer', fontSize: '13px' },
+        btnO: { background: 'transparent', border: '1px solid #1c1c30', color: '#9ca3af', padding: '7px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' },
+        btnG: { background: '#052e16', border: '1px solid #166534', color: '#4ade80', padding: '7px 13px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 },
+        btnPurpleSm: { background: '#5b21b6', color: '#fff', padding: '9px 18px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600 },
+        btnDarkSm: { background: '#111', color: '#e2e8f0', padding: '9px 18px', borderRadius: '8px', border: '1px solid #333', cursor: 'pointer', fontSize: '13px', fontWeight: 600 },
+        progressBar: { height: '5px', background: '#1a1a2e', borderRadius: '3px', overflow: 'hidden', marginTop: '10px' },
+        progressFill: (p) => ({ height: '100%', width: `${p}%`, background: 'linear-gradient(90deg,#7c3aed,#4338ca)', transition: 'width 0.4s ease', borderRadius: '3px' }),
+        stageRow: { display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '10px' },
+        pill: (a, d) => ({ fontSize: '10px', padding: '3px 9px', borderRadius: '20px', background: d ? '#1e1b4b' : a ? '#2d1b69' : '#06060e', color: d ? '#a78bfa' : a ? '#c4b5fd' : '#2d3748', border: `1px solid ${d ? '#4c1d95' : a ? '#5b21b6' : '#18182a'}` }),
+        resBox: { background: '#06060e', border: '1px solid #312e81', borderRadius: '10px', padding: '14px', marginTop: '10px' },
+        resUrl: { wordBreak: 'break-all', fontSize: '11.5px', color: '#93c5fd', fontFamily: 'monospace', background: '#080814', padding: '10px', borderRadius: '6px', border: '1px solid #1e3a5f', lineHeight: 1.5 },
+        errBox: { background: '#1a0000', border: '1px solid #7f1d1d', borderRadius: '8px', padding: '10px 13px', color: '#fca5a5', fontSize: '13px', marginBottom: '12px' },
+        qrPage: { background: '#fff', borderRadius: '16px', padding: '24px 20px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', marginTop: '10px', maxWidth: '340px', margin: '10px auto 0' },
+        qrTimer: { fontSize: '18px', fontWeight: 700, color: '#7c3aed', textAlign: 'center' },
+        qrTimerSub: { fontSize: '13px', color: '#555', marginTop: '2px', textAlign: 'center' },
+        qrInfo: { width: '100%', fontSize: '13px', color: '#333', lineHeight: 2 },
+        qrBtns: { display: 'flex', gap: '10px', width: '100%', justifyContent: 'center' },
+      };
+
+      const stageIdx = STAGES.indexOf(currentStage);
+
+      // ── Sub‑tabs: CPA, API ────────────────────────────────────────────────
+      const CpaTab = () => {
+        const [link, setLink] = useState('');
+        const [res, setRes] = useState(null);
+        const go = () => {
+          if (!link.trim()) return;
+          const id = Math.random().toString(36).substr(2, 16);
+          setRes({
+            fn: `chatgpt_payment_${id}.cpa`,
+            b64: btoa(JSON.stringify({ payment_url: link, generated: new Date().toISOString(), id }))
+          });
+        };
+        return (
+          <div style={S.wrap}>
+            <div style={S.card}>
+              <div style={S.secTitle}>📄 Convert to CPA File</div>
+              <p style={{ color: '#374151', fontSize: '13px', marginBottom: '12px' }}>Convert a payment long-link into CPA format for specific payment flows.</p>
+              <label style={S.label}>Paste Payment Long Link</label>
+              <textarea style={{ ...S.textarea, height: '56px' }} value={link} onChange={e => setLink(e.target.value)} placeholder="https://pay.openai.com/c/pay/cs_live_..." />
+              <button style={{ ...S.btnP, marginTop: '10px', fontSize: '13px', padding: '9px 20px' }} onClick={go}>Generate CPA File</button>
+              {res && <div style={{ ...S.resBox, marginTop: '12px' }}>
+                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>✅ <strong style={{ color: '#a78bfa' }}>{res.fn}</strong></div>
+                <div style={{ ...S.resUrl }}>{res.b64.substr(0, 80)}…</div>
+                <button style={{ ...S.btnG, marginTop: '10px' }} onClick={() => { const a = document.createElement('a'); a.href = "data:application/octet-stream;base64," + res.b64; a.download = res.fn; a.click(); }}>⬇ Download</button>
+              </div>}
+            </div>
+          </div>
+        );
+      };
+
+      const ApiTab = () => (
+        <div style={S.wrap}>
+          <div style={S.card}>
+            <div style={S.secTitle}>🔑 API Mode</div>
+            <p style={{ color: '#374151', fontSize: '13px', marginBottom: '12px' }}>Call via API key — suitable for developers and bulk usage.</p>
+            <label style={S.label}>Endpoint</label>
+            <div style={S.resUrl}>POST https://payurl.ark2.cn/api/generate</div>
+            <label style={{ ...S.label, marginTop: '12px' }}>Request Body</label>
+            <pre style={{ ...S.resUrl, fontSize: '11px', overflow: 'auto' }}>{JSON.stringify({ token: 'eyJhbGci…', plan: 'plus', region: 'JP', link_type: 'long' }, null, 2)}</pre>
+            <div style={{ marginTop: '10px', padding: '10px', background: '#1a1a2e', borderRadius: '6px', fontSize: '12px', color: '#818cf8' }}>⚠️ API requires credits. Purchase from the store.</div>
+          </div>
+        </div>
+      );
+
+      // ── UPI Result Page ────────────────────────────────────────────────────
+      const UpiPage = () => {
+        if (!upiResult) return null;
+        const expired = countdown.expired;
+        return (
+          <div style={S.card}>
+            <div style={{ ...S.secTitle, color: '#a78bfa' }}>✅ UPI Payment QR Generated</div>
+            <div style={S.qrPage}>
+              {!expired
+                ? <QRDisplay text={upiResult.upiStr} size={220} />
+                : <div style={{ width: 220, height: 220, background: '#f3f4f6', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '8px' }}>
+                    <span style={{ fontSize: '32px' }}>⏰</span>
+                    <span style={{ fontSize: '13px', color: '#6b7280', fontWeight: 600 }}>QR Expired</span>
+                  </div>
+              }
+              <div>
+                <div style={S.qrTimer}>QR code expires in {countdown.display}</div>
+                <div style={S.qrTimerSub}>{expired ? 'Please regenerate the link.' : 'Scan quickly before it expires'}</div>
+              </div>
+              <div style={{ ...S.qrInfo, width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb', paddingBottom: '4px', marginBottom: '4px' }}>
+                  <span style={{ color: '#6b7280' }}>Status:</span>
+                  <span style={{ fontWeight: 600, color: payStatus === 'paid' ? '#16a34a' : payStatus === 'failed' ? '#dc2626' : '#d97706' }}>
+                    {payStatus === 'paid' ? '✅ paid' : payStatus === 'failed' ? '❌ failed' : '⏳ pending'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb', paddingBottom: '4px', marginBottom: '4px' }}>
+                  <span style={{ color: '#6b7280' }}>Payment:</span>
+                  <span style={{ fontWeight: 600 }}>{payStatus === 'paid' ? `₹${upiResult.amount}` : '–'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb', paddingBottom: '4px', marginBottom: '4px' }}>
+                  <span style={{ color: '#6b7280' }}>GPT:</span>
+                  <span style={{ fontWeight: 600, fontSize: '12px' }}>{upiResult.email !== 'unknown' ? upiResult.email : 'unknown'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb', paddingBottom: '4px', marginBottom: '4px' }}>
+                  <span style={{ color: '#6b7280' }}>Amount:</span>
+                  <span style={{ fontWeight: 700, color: upiResult.amount === 0 ? '#16a34a' : '#111' }}>
+                    {upiResult.amount === 0 ? '₹0 (Trial – FREE)' : `₹${upiResult.amount.toLocaleString()}`}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#6b7280' }}>UPI ID:</span>
+                  <span style={{ fontWeight: 600, fontSize: '12px', color: '#4338ca' }}>{upiResult.pa}</span>
+                </div>
+              </div>
+              <div style={S.qrBtns}>
+                <button style={S.btnPurpleSm} onClick={checkPayment} disabled={checkingPay}>
+                  {checkingPay ? 'Checking…' : 'Check now'}
+                </button>
+                <a href={`https://pay.stripe.com/${upiResult.stripeSession}`} target="_blank" rel="noreferrer">
+                  <button style={S.btnDarkSm}>Open Stripe page</button>
+                </a>
+              </div>
+              {payStatus === 'paid' && (
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#166534', fontWeight: 600, textAlign: 'center', width: '100%', boxSizing: 'border-box' }}>
+                  🎉 Payment confirmed! Your ChatGPT account is now active.
+                </div>
+              )}
+              <div style={{ width: '100%' }}>
+                <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px' }}>UPI Deep Link</div>
+                <div style={{ ...S.resUrl, fontSize: '10.5px', background: '#f9fafb', color: '#374151', border: '1px solid #e5e7eb', wordBreak: 'break-all' }}>{upiResult.upiStr}</div>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                  <button style={S.btnG} onClick={() => copyText(upiResult.upiStr, 'upistr')}>{copied === 'upistr' ? '✅ Copied!' : '📋 Copy UPI Link'}</button>
+                  <button style={S.btnG} onClick={() => copyText(upiResult.pa, 'paid')}>{copied === 'paid' ? '✅ Copied!' : '📋 Copy UPI ID'}</button>
+                  <a href={upiResult.upiStr} style={{ textDecoration: 'none' }}>
+                    <button style={{ ...S.btnP, fontSize: '12px', padding: '7px 14px' }}>Open in UPI App →</button>
+                  </a>
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+              <button style={S.btnO} onClick={() => setShowRaw(!showRaw)}>{showRaw ? 'Hide Raw' : 'View Raw JSON'}</button>
+            </div>
+            {showRaw && <pre style={{ ...S.resUrl, marginTop: '8px', fontSize: '10px', overflow: 'auto', maxHeight: '200px' }}>{upiResult.raw}</pre>}
+          </div>
+        );
+      };
+
+      // ── Link Result Page ──────────────────────────────────────────────────
+      const LinkPage = () => {
+        if (!result) return null;
+        const expired = countdown.expired;
+        return (
+          <div style={S.card}>
+            <div style={{ ...S.secTitle, color: '#a78bfa' }}>✅ Payment Link Generated</div>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '10px' }}>
+              {[
+                ['Plan', result.plan.toUpperCase()],
+                ['Region', result.region],
+                ['Currency', result.currency],
+                ['Amount', result.trial ? `${result.symbol}0 (Trial – FREE)` : `${result.symbol}${result.amount}`],
+                ['Email', result.email],
+              ].map(([k, v]) => (
+                <div key={k} style={{ background: '#06060e', border: '1px solid #18182a', borderRadius: '6px', padding: '6px 10px', fontSize: '11px' }}>
+                  <span style={{ color: '#374151' }}>{k}: </span>
+                  <span style={{ color: k === 'Amount' && result.trial ? '#4ade80' : k === 'Email' ? '#93c5fd' : '#a78bfa', fontWeight: 600 }}>{v}</span>
+                </div>
+              ))}
+            </div>
+            {result.trial && (
+              <div style={{ background: '#052e16', border: '1px solid #166534', borderRadius: '8px', padding: '9px 13px', fontSize: '12px', color: '#4ade80', marginBottom: '10px' }}>
+                🎁 <strong>Trial Region detected!</strong> Payment amount = <strong>{result.symbol}0</strong>. No card charge!
+              </div>
+            )}
+            <div style={{ ...S.qrPage, background: '#fff', maxWidth: '340px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#111', textAlign: 'center' }}>Scan to open payment page</div>
+              <QRDisplay text={result.url} size={200} />
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#7c3aed', textAlign: 'center' }}>
+                QR code expires in {countdown.display}
+              </div>
+              <div style={{ ...S.qrInfo }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb', paddingBottom: '4px', marginBottom: '4px' }}>
+                  <span style={{ color: '#6b7280' }}>Status:</span>
+                  <span style={{ fontWeight: 600, color: payStatus === 'paid' ? '#16a34a' : '#d97706' }}>{payStatus === 'paid' ? '✅ paid' : '⏳ pending'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb', paddingBottom: '4px', marginBottom: '4px' }}>
+                  <span style={{ color: '#6b7280' }}>Payment:</span>
+                  <span style={{ fontWeight: 600 }}>{payStatus === 'paid' ? `${result.symbol}${result.amount}` : '–'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#6b7280' }}>GPT:</span>
+                  <span style={{ fontWeight: 600, fontSize: '12px' }}>{result.email}</span>
+                </div>
+              </div>
+              <div style={S.qrBtns}>
+                <button style={S.btnPurpleSm} onClick={checkPayment} disabled={checkingPay}>
+                  {checkingPay ? 'Checking…' : 'Check now'}
+                </button>
+                <a href={result.url} target="_blank" rel="noreferrer">
+                  <button style={S.btnDarkSm}>Open Stripe page</button>
+                </a>
+              </div>
+              {payStatus === 'paid' && (
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px', fontSize: '13px', color: '#166534', fontWeight: 600, textAlign: 'center', width: '100%', boxSizing: 'border-box' }}>
+                  🎉 Payment confirmed! Your account is now active.
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button style={S.btnG} onClick={() => copyText(result.url, 'url')}>{copied === 'url' ? '✅ Copied!' : '📋 Copy Link'}</button>
+              <button style={S.btnO} onClick={() => setShowRaw(!showRaw)}>{showRaw ? 'Hide Raw' : 'View Raw JSON'}</button>
+            </div>
+            {showRaw && <pre style={{ ...S.resUrl, marginTop: '8px', fontSize: '10px', overflow: 'auto', maxHeight: '200px' }}>{result.raw}</pre>}
+          </div>
+        );
+      };
+
+      // ─── MAIN RENDER ──────────────────────────────────────────────────────
+      return (
+        <div style={S.root}>
+          {/* Navigation */}
+          <nav style={S.nav}>
+            <div style={S.brand}>
+              <div style={S.logo}>🐔</div>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#6d28d9' }}>PayURL</span>
+            </div>
+            {[{ id: 'main', label: 'Long Link' }, { id: 'cpa', label: 'CPA File' }, { id: 'api', label: 'API' }].map(t => (
+              <button key={t.id} style={S.navTab(activeTab === t.id)} onClick={() => setActiveTab(t.id)}>{t.label}</button>
+            ))}
+          </nav>
+
+          {activeTab === 'cpa' ? <CpaTab /> : activeTab === 'api' ? <ApiTab /> : (
+            <div style={S.wrap}>
+              <h1 style={S.h1}>🐔 PayURL — Payment Link Generator</h1>
+              <p style={S.sub}>Public-benefit tool · No login required · All features free</p>
+
+              <div style={S.badge}>📢 June 8 Update: Email-registered GPT accounts can now skip the Stripe page to extract Japan-region PP links.</div>
+
+              <div style={S.privacy}>
+                🔒 <strong style={{ color: '#4b5563' }}>Privacy:</strong> Token, proxy, and results are NOT stored on the server.
+                Proxy is saved in your browser localStorage only. Server logs are disabled. Only anonymous aggregate stats are kept.
+              </div>
+
+              {/* Stats */}
+              <div style={S.statsRow}>
+                {[
+                  ['👥', onlineUsers, 'Online Now', 'Sessions in last 75s'],
+                  ['🔗', totalGenerated.toLocaleString(), 'Total Generated', 'Successful links'],
+                  ['📡', `${proxyTraffic} GB`, 'Proxy Traffic', 'Quota: 500 GB']
+                ].map(([ic, v, l, s]) => (
+                  <div key={l} style={S.stat}>
+                    <div style={{ fontSize: '15px', marginBottom: '2px' }}>{ic}</div>
+                    <div style={S.statN}>{v}</div>
+                    <div style={{ ...S.statL, color: '#4b5563', fontSize: '11px' }}>{l}</div>
+                    <div style={S.statL}>{s}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Token */}
+              <div style={S.card}>
+                <label style={S.label}>Access Token or Session JSON</label>
+                <textarea style={S.textarea} value={tokenRaw} onChange={e => setTokenRaw(e.target.value)}
+                  placeholder={'Paste your OpenAI Access Token or Session JSON here…\n\nExample JSON: {"email":"user@gmail.com","accessToken":"eyJ…","region":"US"}'} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '7px', flexWrap: 'wrap', gap: '6px' }}>
+                  <span style={{ fontSize: '12px', color: tokenStatus.startsWith('✅') ? '#4ade80' : tokenStatus.startsWith('⚠️') ? '#facc15' : '#4b5563' }}>
+                    {tokenStatus}
+                  </span>
+                  <button style={S.btnO} onClick={pasteToken}>📋 Paste from Clipboard</button>
+                </div>
+                {sessionInfo?.email && (
+                  <div style={{ marginTop: '10px', background: '#0a1628', border: '1px solid #1e3a5f', borderRadius: '8px', padding: '10px 13px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                    {sessionInfo.email && <span style={{ fontSize: '12px' }}><span style={{ color: '#4b5563' }}>Email: </span><span style={{ color: '#93c5fd', fontWeight: 600 }}>{sessionInfo.email}</span></span>}
+                    {sessionInfo.name && <span style={{ fontSize: '12px' }}><span style={{ color: '#4b5563' }}>Name: </span><span style={{ color: '#c4b5fd' }}>{sessionInfo.name}</span></span>}
+                    {sessionInfo.region && <span style={{ fontSize: '12px' }}><span style={{ color: '#4b5563' }}>Region: </span><span style={{ color: '#86efac' }}>{sessionInfo.region}</span></span>}
+                    {sessionInfo.plan && <span style={{ fontSize: '12px' }}><span style={{ color: '#4b5563' }}>Plan: </span><span style={{ color: '#fde68a' }}>{sessionInfo.plan}</span></span>}
+                  </div>
+                )}
+              </div>
+
+              {/* Plan · Link Type · Language */}
+              <div style={S.card}>
+                <div style={S.row}>
+                  <div style={S.col}>
+                    <div style={S.secTitle}>Plan</div>
+                    <div style={S.radioG}>
+                      {PLANS.map(p => (
+                        <label key={p.id} style={S.radioI(false)}>
+                          <input type="radio" name="plan" checked={plan === p.id} onChange={() => setPlan(p.id)} style={S.radio} />
+                          <span><span>{p.label}</span><span style={{ display: 'block', fontSize: '10px', color: '#374151' }}>{p.desc}</span></span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={S.col}>
+                    <div style={S.secTitle}>Link Type</div>
+                    <div style={S.radioG}>
+                      {LINK_TYPES.map(l => (
+                        <label key={l.id} style={S.radioI(l.disabled)}>
+                          <input type="radio" name="lt" checked={linkType === l.id} disabled={l.disabled} onChange={() => !l.disabled && setLinkType(l.id)} style={S.radio} />
+                          <span style={{ fontSize: '12px' }}>{l.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={S.col}>
+                    <div style={S.secTitle}>Page Language</div>
+                    <div style={S.radioG}>
+                      {[{ id: 'en', l: 'English' }, { id: 'auto', l: 'Follow Region' }, { id: 'zh', l: 'Simplified Chinese' }].map(x => (
+                        <label key={x.id} style={S.radioI(false)}>
+                          <input type="radio" name="lang" checked={language === x.id} onChange={() => setLanguage(x.id)} style={S.radio} />
+                          {x.l}
+                        </label>
+                      ))}
+                    </div>
+                    <div style={S.hint}>Affects payment page display only.</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Region + Currency + Amount */}
+              <div style={S.card}>
+                <div style={S.row}>
+                  <div style={S.col}>
+                    <label style={S.label}>Region</label>
+                    <select style={S.select} value={region} onChange={e => setRegion(e.target.value)}>
+                      {REGIONS.map(r => (
+                        <option key={r.code} value={r.code}>{r.name}{r.trial ? ' 🎁' : ''}</option>
+                      ))}
+                    </select>
+                    <div style={S.hint}>Currency switches automatically with region.</div>
+                  </div>
+                  <div style={{ ...S.col, maxWidth: '150px' }}>
+                    <label style={S.label}>Currency</label>
+                    <input style={{ ...S.input, color: '#a78bfa' }} value={regionObj.currency} readOnly />
+                  </div>
+                  <div style={{ ...S.col, maxWidth: '180px' }}>
+                    <label style={S.label}>Amount</label>
+                    <input style={{ ...S.input, color: regionObj.trial ? '#4ade80' : '#f1f5f9', fontWeight: 600 }}
+                      value={regionObj.trial ? `${regionObj.symbol}0 — FREE Trial` : `${regionObj.symbol}${regionObj.amount.toLocaleString()}`}
+                      readOnly />
+                    {regionObj.trial && <div style={{ ...S.hint, color: '#166534' }}>🎁 Trial region — $0 payment!</div>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Proxy */}
+              <div style={S.card}>
+                <div style={S.secTitle}>Proxy Settings</div>
+                <div style={S.row}>
+                  <div style={S.col}>
+                    <label style={S.label}>Proxy Pool</label>
+                    <div style={S.radioG}>
+                      {PROXY_POOLS.map(p => (
+                        <label key={p.id} style={S.radioI(false)}>
+                          <input type="radio" name="pool" checked={proxyPool === p.id} onChange={() => setProxyPool(p.id)} style={S.radio} />
+                          {p.label}
+                        </label>
+                      ))}
+                    </div>
+                    <div style={S.hint}>Healthy IPs auto-assigned; failed IPs temporarily cooled down.</div>
+                  </div>
+                  <div style={S.col}>
+                    <label style={S.label}>Custom Proxy (optional)</label>
+                    <input style={S.input} value={customProxy} onChange={e => setCustomProxy(e.target.value)} placeholder="http://user:pass@host:port" />
+                    <div style={S.hint}>Leave blank to use pool auto-selection.</div>
+                    <div style={{ marginTop: '10px' }}>
+                      <label style={S.label}>Stripe Proxy</label>
+                      <select style={S.select} value={stripeProxy} onChange={e => setStripeProxy(e.target.value)}>
+                        <option value="auto">Auto (server default)</option>
+                        <option value="custom">Custom</option>
+                        <option value="donate">Donated Proxy</option>
+                      </select>
+                    </div>
+                    {stripeProxy === 'custom' && <input style={{ ...S.input, marginTop: '7px' }} value={customStripeP} onChange={e => setCustomStripeP(e.target.value)} placeholder="http://…" />}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '11px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button style={S.btnO} onClick={checkProxy} disabled={proxyChecking}>{proxyChecking ? 'Checking…' : 'Check Proxy'}</button>
+                  <button style={S.btnO} onClick={() => { if (customProxy) { localStorage.setItem('saved_proxy', customProxy); alert('Proxy saved!'); } }}>Save</button>
+                  <button style={S.btnO} onClick={() => { localStorage.removeItem('saved_proxy'); setCustomProxy(''); }}>Clear</button>
+                  <span style={{ fontSize: '12px', color: proxyStatus.startsWith('✅') ? '#4ade80' : '#4b5563' }}>{proxyStatus}</span>
+                </div>
+              </div>
+
+              {/* Team */}
+              {plan === 'team' && (
+                <div style={S.card}>
+                  <div style={S.secTitle}>Team Settings</div>
+                  <div style={S.row}>
+                    <div style={S.col}>
+                      <label style={S.label}>Workspace Name</label>
+                      <input style={S.input} value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="My Team Workspace" />
+                    </div>
+                    <div style={{ width: '130px' }}>
+                      <label style={S.label}>Seats</label>
+                      <input style={S.input} type="number" min={2} value={seats} onChange={e => setSeats(Number(e.target.value))} />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: '10px' }}>
+                    <label style={S.label}>Promo Code / Link</label>
+                    <input style={S.input} value={promoCode} onChange={e => setPromoCode(e.target.value)} placeholder="Enter promo code…" />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
+                    <Toggle on={usePromo} onChange={setUsePromo} />
+                    <span style={{ fontSize: '13px' }}>Use Promo Parameters</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Advanced */}
+              <div style={S.card}>
+                <div style={S.secTitle}>Advanced Options</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '13px' }}>
+                  {[
+                    [skipStripe, setSkipStripe, 'Skip Stripe Payment Page', 'Supports email-registered accounts. Extracts PP link directly.'],
+                    [upiGuard, setUpiGuard, 'Enable UPI Manual Attendant', 'Pushes QR to specified random code; credits settled per code.'],
+                  ].map(([on, fn, title, hint]) => (
+                    <div key={title} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                      <Toggle on={on} onChange={fn} />
+                      <div><div style={{ fontSize: '13px', fontWeight: 500 }}>{title}</div><div style={S.hint}>{hint}</div></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Generate button */}
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '13px', flexWrap: 'wrap' }}>
+                <button style={{ ...S.btnP, opacity: generating ? 0.6 : 1 }} onClick={generate} disabled={generating}>
+                  {generating ? 'Generating…' : 'Generate Payment Link'}
+                </button>
+                {generating && <button style={S.btnStop} onClick={stop}>■ Stop</button>}
+                <button style={S.btnO} onClick={() => setActiveTab('api')}>API Mode</button>
+              </div>
+
+              {/* Progress */}
+              <div style={S.card}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', color: '#4b5563' }}>
+                    {currentStage === 'Done' ? '✅ Complete' : currentStage === 'Stopped' ? '■ Stopped' : currentStage ? `${currentStage}…` : 'Waiting to start'}
+                  </span>
+                  <span style={{ fontSize: '12px', color: '#6b7280' }}>{progress}%</span>
+                </div>
+                <div style={S.progressBar}><div style={S.progressFill(progress)} /></div>
+                <div style={S.stageRow}>
+                  {STAGES.map((s, i) => <span key={s} style={S.pill(s === currentStage, stageIdx > i)}>{s}</span>)}
+                </div>
+              </div>
+
+              {/* Error */}
+              {error && <div style={S.errBox}>❌ {error}</div>}
+
+              {/* Results */}
+              <UpiPage />
+              <LinkPage />
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ─── RENDER ──────────────────────────────────────────────────────────────
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<PayURLClone />);
+  </script>
+</body>
+</html>
